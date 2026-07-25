@@ -1,0 +1,36 @@
+{
+  "name": "blackjack-21-game",
+  "version": "1.0.0",
+  "description": "Blackjack 21",
+  "main": "build.js",
+  "scripts": {
+    "build": "node build.js",
+    "test": "node --test \"scripts/**/*.test.js\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Micorlov/blackjack-21-game.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Micorlov/blackjack-21-game/issues"
+  },
+  "homepage": "https://github.com/Micorlov/blackjack-21-game#readme",
+  "dependencies": {
+    "@capacitor-firebase/authentication": "^8.3.0",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/browser": "^8.0.3",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.4.2",
+    "@capacitor/push-notifications": "^8.1.2",
+    "chromedriver": "^150.0.4",
+    "firebase-admin": "^14.2.0",
+    "selenium-webdriver": "^4.46.0"
+  }
+}

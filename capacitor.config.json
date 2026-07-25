@@ -1,0 +1,15 @@
+{
+  "appId": "com.micorlov.blackjack21",
+  "appName": "Blackjack 21",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "zoomEnabled": false
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com"]
+    }
+  }
+}

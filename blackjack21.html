@@ -1,0 +1,2214 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Blackjack 21</title>
+
+    <!--
+      CUSTOM-SCHEME HAND-OFF (optional, keep only if the app has deep links).
+      A shared link tapped inside another app (WhatsApp, Telegram) opens the web
+      page. If the visitor has the native app installed, hand off to it via the
+      custom scheme. Deferred until `load`: firing a location change to an
+      unregistered scheme BEFORE first paint leaves some mobile browsers on a
+      permanent blank page instead of resuming this document.
+    -->
+    <script>
+    (function () {
+        try {
+            var runningInApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+            if (runningInApp) return;
+
+            var params = new URLSearchParams(window.location.search);
+            if (!params.get('ref') && !params.get('join')) return;
+
+            window.addEventListener('load', function () {
+                window.location.href = 'blackjack21://open?' + params.toString();
+            });
+        } catch (e) { /* best-effort — the web experience below still works */ }
+    })();
+    </script>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a2e1c">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!--
+      CONVENTION: build.js replaces this exact comment with every file in its
+      cssFiles array, concatenated in order, inside this single <style> tag.
+      Do not add <link> tags for local stylesheets — they would not survive the
+      single-file build. Keep the comment on its own line, unmodified.
+    -->
+    <style>
+
+/* --- styles/tokens.css --- */
+/* Design tokens + global resets. MUST be the first entry in build.js cssFiles —
+   every other stylesheet reads these custom properties.
+
+   THE PALETTE IS THE THING TO SWAP PER APP. What follows is a deliberately
+   neutral slate placeholder so a new app is legible on day one and obviously
+   un-branded. Replace the --surface-*/--accent-*/--text-* values (and the two
+   theme blocks below) with the app's real palette; leave the *variable names*
+   alone, since layout.css and every feature stylesheet reference them. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    /* Surface ramp — darkest to lightest. Casino felt green. */
+    --surface-900: #051911;
+    --surface-800: #0a2e1c;
+    --surface-700: #123825;
+    --surface-600: #1d4a34;
+
+    --bg-top: var(--surface-800);
+    --bg-bottom: var(--surface-900);
+    --panel: var(--surface-700);
+    --panel-solid: var(--surface-700);
+    --border: var(--surface-600);
+    --border-strong: var(--surface-600);
+
+    /* Accent — the one colour that carries brand identity. Used for the active
+       nav item, primary buttons and selected states. Casino gold. */
+    --accent: #d4af37;
+    --accent-600: #b8942e;
+    --accent-100: #f5e6b8;
+    --accent-dim: rgba(212, 175, 55, 0.14);
+
+    /* Semantic status colours */
+    --positive: #4caf7d;
+    --positive-dim: rgba(76, 175, 125, 0.15);
+    --negative: #e6533f;
+    --negative-dim: rgba(230, 83, 63, 0.12);
+
+    /* Text ramp */
+    --text: #f2f3f5;
+    --text-muted: #b4b8c0;
+    --text-faint: rgba(180, 184, 192, 0.6);
+
+    /* Shape */
+    --radius-lg: 16px;
+    --radius-md: 14px;
+    --radius-sm: 12px;
+
+    /* Height of the fixed bottom nav. layout.css uses this to reserve scroll
+       space at the bottom of .app — change it here, not in two places. */
+    --nav-height: 64px;
+}
+
+/* THEME OVERRIDES
+   Each alternate theme is a `body.theme-<name>` block that re-declares only the
+   variables it changes. js/tabs.js setTheme() adds exactly one of these classes
+   (the default theme adds none) and persists the choice in
+   localStorage['bj21_theme']. To add a theme: add a block here, add
+   the name to the THEMES array in js/tabs.js, and add a `theme-<name>` button
+   in index.html. */
+
+/* --- Midnight theme (blue felt) --- */
+body.theme-ocean {
+    --surface-900: #060e1c;
+    --surface-800: #0c1c32;
+    --surface-700: #142a45;
+    --surface-600: #203e5e;
+    --bg-top: var(--surface-800);
+    --bg-bottom: var(--surface-900);
+    --panel: var(--surface-700);
+    --panel-solid: var(--surface-700);
+    --border: var(--surface-600);
+    --border-strong: var(--surface-600);
+    --accent: #f5c451;
+    --accent-600: #d4a53a;
+    --accent-dim: rgba(245, 196, 81, 0.12);
+    --text: #f0f4f8;
+    --text-muted: #a9b7c4;
+    --text-faint: rgba(169, 183, 196, 0.6);
+}
+
+/* --- Ruby theme (red felt) --- */
+body.theme-ember {
+    --surface-900: #1a0708;
+    --surface-800: #2b0c0d;
+    --surface-700: #3d1416;
+    --surface-600: #5c1e21;
+    --bg-top: var(--surface-800);
+    --bg-bottom: var(--surface-900);
+    --panel: var(--surface-700);
+    --panel-solid: var(--surface-700);
+    --border: var(--surface-600);
+    --border-strong: var(--surface-600);
+    --accent: #ffb457;
+    --accent-600: #d9903c;
+    --accent-dim: rgba(255, 180, 87, 0.12);
+    --text: #f6efe8;
+    --text-muted: #c9b6b6;
+    --text-faint: rgba(201, 182, 182, 0.6);
+    --negative: #ff6b6b;
+    --negative-dim: rgba(255, 107, 107, 0.12);
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: 'Manrope', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    background: linear-gradient(180deg, var(--bg-top), var(--bg-bottom) 60%);
+    min-height: 100vh;
+    color: var(--text);
+    /* touch-action + user-select: makes a web page feel like an app instead of
+       a document — no double-tap zoom, no accidental text selection on taps. */
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+button, input, select {
+    font-family: inherit;
+    color: inherit;
+}
+
+/* THE universal show/hide utility. Every modal, sheet, sub-tab view and
+   feature-flagged element in the app is toggled with classList.toggle('hidden').
+   !important so it always beats a component's own display rule. */
+.hidden { display: none !important; }
+
+
+/* --- styles/layout.css --- */
+/* App shell: page frame, screens, bottom nav, overlays, and the handful of
+   primitives (panel / button / toast) every screen reuses. Depends on
+   styles/tokens.css for every colour and radius — no literal hex here. */
+
+/* --- Page frame --- */
+/* Phone-width column centred on desktop. The bottom padding reserves space for
+   the fixed nav so the last element on a screen is never hidden behind it. */
+.app {
+    max-width: 460px;
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: max(20px, env(safe-area-inset-top))
+             max(16px, env(safe-area-inset-right))
+             calc(var(--nav-height) + 24px)
+             max(16px, env(safe-area-inset-left));
+    position: relative;
+}
+
+.brandrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.app-title {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+/* --- Screens --- */
+/* Only one screen is in the document flow at a time; showScreen() in js/tabs.js
+   moves the `active` class. */
+.screen { display: none; }
+.screen.active { display: block; }
+
+.screen-title {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+/* --- Content primitives --- */
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+}
+
+.panel + .panel { margin-top: 12px; }
+
+.section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 20px 2px 8px;
+}
+
+.section-label:first-child { margin-top: 0; }
+
+.muted { color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+
+.stat-value { font-size: 32px; font-weight: 800; }
+.stat-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.row-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* --- Buttons --- */
+.btn-row { display: flex; gap: 8px; margin-top: 12px; }
+
+.btn-primary, .btn-secondary {
+    flex: 1;
+    padding: 14px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: var(--surface-900);
+}
+
+.btn-primary:active { background: var(--accent-600); }
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+}
+
+.btn-secondary:active { background: var(--accent-dim); }
+
+/* --- Sub-tabs (in-screen segmented control) --- */
+/* `.selected` (not `.active` — that belongs to screens/nav) is the state class
+   js/tabs.js setSubTab() toggles. */
+.subtabs { display: flex; gap: 8px; margin-bottom: 12px; }
+
+.subtab {
+    flex: 1;
+    padding: 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.subtab.selected {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* --- Bottom nav --- */
+.bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    background: color-mix(in srgb, var(--surface-800) 92%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--border);
+    padding: 8px max(8px, env(safe-area-inset-right))
+             max(8px, env(safe-area-inset-bottom))
+             max(8px, env(safe-area-inset-left));
+}
+
+/* Keeps the nav items aligned with the .app column on wide screens while the
+   bar itself still spans the full viewport. */
+.bottom-nav-inner {
+    width: 100%;
+    max-width: 460px;
+    display: flex;
+}
+
+.nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    padding: 6px 4px;
+    color: var(--text-faint);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.nav-btn .nav-icon { font-size: 20px; line-height: 1; }
+
+.nav-btn.active { color: var(--accent); }
+
+/* --- Modals (centred) --- */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-box {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    background: var(--panel-solid);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 24px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.modal-title { font-size: 18px; font-weight: 800; }
+.modal-sub { font-size: 13px; color: var(--text-muted); }
+
+.modal-error {
+    font-size: 12px;
+    color: var(--negative);
+    background: var(--negative-dim);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+}
+
+/* --- Bottom sheets --- */
+.sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 500;
+    display: flex;
+    align-items: flex-end;
+}
+
+.sheet {
+    width: 100%;
+    background: var(--panel-solid);
+    border-radius: 20px 20px 0 0;
+    border-top: 1px solid var(--border-strong);
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sheet-title { font-size: 17px; font-weight: 800; }
+
+.sheet-close {
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+/* --- Toast (created on demand by showToast() in js/ui.js) --- */
+.toast {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--panel-solid);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* --- PWA install bar (created on demand by js/pwa.js) --- */
+.pwa-bar {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--nav-height) + 12px);
+    z-index: 400;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel-solid);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    font-size: 13px;
+}
+
+.pwa-bar span { flex: 1; }
+
+.pwa-bar-yes {
+    background: var(--accent);
+    color: var(--surface-900);
+    border: none;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.pwa-bar-no {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+
+/* --- styles/blackjack.css --- */
+/* Casino table look for the core Blackjack screen. Built entirely on
+   styles/tokens.css custom properties — the only literal colours here are
+   card faces (need real white/red/black regardless of theme) and the chip
+   denomination tints, which reuse the app's existing semantic colours. */
+
+/* --- Chip balance (brandrow) --- */
+.chip-balance {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+/* --- Felt table --- */
+.felt-table {
+    background: radial-gradient(circle at 50% 0%, var(--surface-600), var(--surface-800) 75%);
+    border-color: var(--border-strong);
+}
+
+.table-row { padding: 6px 0; }
+.table-row + .table-row { border-top: 1px dashed var(--border); }
+
+.hand-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.hand-value {
+    color: var(--text);
+    font-weight: 800;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.player-row.active-hand .hand-label { color: var(--accent); }
+
+.card-row {
+    display: flex;
+    gap: 8px;
+    min-height: 84px;
+    flex-wrap: wrap;
+}
+
+.table-message {
+    min-height: 22px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 800;
+    padding: 6px 0;
+}
+
+.table-message.message-win { color: var(--positive); }
+.table-message.message-lose { color: var(--negative); }
+.table-message.message-push { color: var(--text-muted); }
+
+/* --- Playing cards --- */
+.bj-card {
+    width: 52px;
+    height: 76px;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 5px 6px;
+    font-weight: 800;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.bj-card-rank { font-size: 15px; }
+.bj-card-suit { font-size: 20px; align-self: flex-end; }
+
+.bj-card-red { color: #c0272d; }
+.bj-card-black { color: #1a1a1a; }
+
+.bj-card-back {
+    background: repeating-linear-gradient(
+        135deg,
+        var(--surface-700),
+        var(--surface-700) 6px,
+        var(--accent-600) 6px,
+        var(--accent-600) 7px
+    );
+    border: 2px solid var(--accent);
+}
+
+/* --- Betting panel --- */
+.bet-display {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.bet-display span { color: var(--accent); font-size: 18px; }
+
+.chip-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.chip {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--panel-solid);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: inset 0 0 0 3px var(--surface-900), 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.chip:active { transform: scale(0.94); }
+
+.chip-25 { border: 3px dashed var(--positive); }
+.chip-50 { border: 3px dashed var(--negative); }
+.chip-100 { border: 3px dashed var(--text); }
+.chip-500 { border: 3px dashed var(--accent); }
+
+/* --- Action + betting buttons --- */
+.action-panel .btn-row { flex-wrap: wrap; }
+.action-panel button { min-width: 40%; }
+
+.action-panel button:disabled,
+#btn-deal:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* --- Out of chips --- */
+.out-of-chips-panel { text-align: center; }
+.out-of-chips-panel .section-label { text-align: center; }
+.out-of-chips-panel .btn-primary { margin-top: 12px; width: 100%; }
+
+/* --- Stats grid (screen-stats) --- */
+.stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.stat-grid .panel { margin-top: 0; }
+
+
+</style>
+
+    <!--
+      Firebase compat CDN builds. compat (not modular) on purpose: the whole app
+      is plain script-tag JS with no bundler, and the compat namespace is what
+      js/firebase.js, js/push.js and sw.js all expect. Drop any product you do
+      not use — but firebase-app-compat must stay first, and the set here must
+      match what sw.js importScripts().
+    -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+</head>
+<body>
+    <!--
+      SCREEN CONVENTION
+      One <section id="screen-X" class="screen"> per bottom-nav tab. Exactly one
+      carries `active` on load (the default screen). js/tabs.js showScreen(name)
+      toggles `.active` on #screen-<name> and on #nav-<name> together, so the
+      id suffixes MUST match the string passed to showScreen().
+      CSS: .screen { display: none } / .screen.active { display: block }.
+    -->
+    <div class="app">
+
+        <section id="screen-home" class="screen active">
+            <div class="brandrow">
+                <div class="app-title">Blackjack 21</div>
+                <div class="chip-balance" id="chip-balance">$1000</div>
+            </div>
+
+            <div class="panel felt-table">
+                <div class="table-row dealer-row">
+                    <div class="hand-label">Dealer <span class="hand-value" id="dealer-value"></span></div>
+                    <div class="card-row" id="dealer-cards"></div>
+                </div>
+
+                <div class="table-message" id="table-message"></div>
+
+                <div class="table-row player-row" id="player-hand-row">
+                    <div class="hand-label">You <span class="hand-value" id="player-value"></span></div>
+                    <div class="card-row" id="player-cards"></div>
+                </div>
+
+                <div class="table-row player-row hidden" id="hand-2-row">
+                    <div class="hand-label">Hand 2 <span class="hand-value" id="player-value-2"></span></div>
+                    <div class="card-row" id="player-cards-2"></div>
+                </div>
+            </div>
+
+            <div class="panel bet-panel" id="bet-panel">
+                <div class="bet-display">Bet <span id="current-bet">$0</span></div>
+                <div class="chip-row">
+                    <button class="chip chip-25" onclick="placeBet(25)">$25</button>
+                    <button class="chip chip-50" onclick="placeBet(50)">$50</button>
+                    <button class="chip chip-100" onclick="placeBet(100)">$100</button>
+                    <button class="chip chip-500" onclick="placeBet(500)">$500</button>
+                </div>
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="clearBet()">Clear</button>
+                    <button class="btn-primary" id="btn-deal" onclick="dealRound()">Deal</button>
+                </div>
+            </div>
+
+            <div class="panel action-panel hidden" id="action-panel">
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="playerHit()">Hit</button>
+                    <button class="btn-secondary" onclick="playerStand()">Stand</button>
+                    <button class="btn-secondary" id="btn-double" onclick="playerDouble()">Double</button>
+                    <button class="btn-secondary" id="btn-split" onclick="playerSplit()">Split</button>
+                </div>
+            </div>
+
+            <div class="panel out-of-chips-panel hidden" id="out-of-chips-panel">
+                <div class="section-label">Out of chips</div>
+                <p class="muted">The house extends you a courtesy stack so you can keep playing.</p>
+                <button class="btn-primary" onclick="resetBankroll()">Get 1000 complimentary chips</button>
+            </div>
+        </section>
+
+        <section id="screen-stats" class="screen">
+            <h1 class="screen-title">Stats</h1>
+
+            <!--
+              SUB-TAB CONVENTION (optional, per screen)
+              Buttons carry `.selected`; the matching views are toggled with
+              `.hidden`. js/tabs.js setSubTab() drives both from one array.
+            -->
+            <div class="subtabs">
+                <button class="subtab selected" id="stats-tab-recent" onclick="setStatsTab('recent')">Recent</button>
+                <button class="subtab" id="stats-tab-alltime" onclick="setStatsTab('alltime')">All time</button>
+            </div>
+            <div id="stats-recent-view">
+                <div class="stat-grid">
+                    <div class="panel"><div class="stat-value" id="stat-session-hands">0</div><div class="stat-label">Hands this session</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-session-wins">0</div><div class="stat-label">Wins this session</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-session-net">$0</div><div class="stat-label">Net chips this session</div></div>
+                </div>
+            </div>
+            <div id="stats-alltime-view" class="hidden">
+                <div class="stat-grid">
+                    <div class="panel"><div class="stat-value" id="stat-hands-played">0</div><div class="stat-label">Hands played</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-win-rate">0%</div><div class="stat-label">Win rate</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-blackjacks">0</div><div class="stat-label">Blackjacks</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-current-streak">0</div><div class="stat-label">Current streak</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-best-streak">0</div><div class="stat-label">Best streak</div></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-settings" class="screen">
+            <h1 class="screen-title">Settings</h1>
+
+            <div class="section-label">Account</div>
+            <div class="panel">
+                <!-- Signed-out / signed-in states are swapped with .hidden by
+                     updateAccountUI() in js/tabs.js. -->
+                <div id="account-signed-out">
+                    <button class="btn-primary" onclick="openModal('signin-modal')">Sign in</button>
+                </div>
+                <div id="account-signed-in" class="hidden">
+                    <div id="account-display-name">Signed in</div>
+                    <button class="btn-secondary" onclick="signOutUser()">Sign out</button>
+                </div>
+            </div>
+
+            <div class="section-label">Appearance</div>
+            <div class="panel">
+                <!-- Theme buttons: id MUST be theme-<name> to match js/tabs.js -->
+                <div class="btn-row">
+                    <button class="subtab selected" id="theme-default" onclick="setTheme('default')">Default</button>
+                    <button class="subtab" id="theme-ocean" onclick="setTheme('ocean')">Ocean</button>
+                    <button class="subtab" id="theme-ember" onclick="setTheme('ember')">Ember</button>
+                </div>
+            </div>
+
+            <div class="section-label">Notifications</div>
+            <!-- Hidden entirely when push is unsupported — see initNotificationSettings() -->
+            <div class="panel hidden" id="settings-notifications-panel">
+                <button class="btn-secondary" id="settings-notifications-enable">Enable notifications</button>
+                <label class="row-toggle">
+                    <span>Social</span>
+                    <input type="checkbox" id="settings-notif-social">
+                </label>
+                <label class="row-toggle">
+                    <span>Leaderboard</span>
+                    <input type="checkbox" id="settings-notif-leaderboard">
+                </label>
+                <label class="row-toggle">
+                    <span>Daily reminder</span>
+                    <input type="checkbox" id="settings-notif-dailyReminder">
+                </label>
+            </div>
+        </section>
+
+    </div>
+
+    <!--
+      BOTTOM NAV CONVENTION
+      One .nav-btn per screen, id="nav-<name>", onclick="showScreen('<name>')".
+      The button whose screen has `active` on load must also carry `active`.
+      .bottom-nav is position:fixed; .app reserves space for it via
+      padding-bottom: calc(var(--nav-height) + …) in styles/layout.css.
+    -->
+    <nav class="bottom-nav">
+        <div class="bottom-nav-inner">
+            <button class="nav-btn active" id="nav-home" onclick="showScreen('home')">
+                <span class="nav-icon">●</span>
+                <span>Home</span>
+            </button>
+            <button class="nav-btn" id="nav-stats" onclick="showScreen('stats')">
+                <span class="nav-icon">▤</span>
+                <span>Stats</span>
+            </button>
+            <button class="nav-btn" id="nav-settings" onclick="showScreen('settings')">
+                <span class="nav-icon">⚙</span>
+                <span>Settings</span>
+            </button>
+        </div>
+    </nav>
+
+    <!--
+      MODAL CONVENTION
+      A centered .modal-backdrop > .modal-box, hidden by default with the
+      `.hidden` utility (display:none !important, defined in styles/tokens.css).
+      Show/hide is ALWAYS classList.remove('hidden') / .add('hidden') — never
+      inline style, so a single utility governs every overlay in the app.
+    -->
+    <div class="modal-backdrop hidden" id="signin-modal">
+        <div class="modal-box">
+            <button class="modal-close" onclick="closeModal('signin-modal')">✕</button>
+            <div class="modal-title">Sign in</div>
+            <div class="modal-sub">Sign in to sync your progress and play with friends.</div>
+            <button class="btn-primary" onclick="signInWithGoogle()">Continue with Google</button>
+            <div class="modal-error hidden" id="signin-error"></div>
+        </div>
+    </div>
+
+    <!--
+      CONVENTION: build.js replaces this exact comment with every file in its
+      jsFiles array, concatenated in order, inside this single <script> tag —
+      placed last so the DOM exists before any top-level module code runs.
+    -->
+    <script>
+
+/* --- js/ui.js --- */
+// Small UI utilities: toast messages + haptic feedback (Settings toggle).
+// No dependencies — this file is first in build.js jsFiles so everything else
+// can call showToast()/triggerHaptic() at any time.
+
+function showToast(text) {
+    let el = document.getElementById('bj21-toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'bj21-toast';
+        el.className = 'toast';
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.classList.remove('show');
+    // Force a reflow so re-adding `show` restarts the CSS transition even when
+    // a second toast fires while the first is still visible.
+    void el.offsetWidth;
+    el.classList.add('show');
+    setTimeout(function() { el.classList.remove('show'); }, 2200);
+}
+
+let hapticsEnabled = true;
+try {
+    const storedHaptics = localStorage.getItem('bj21_haptics_enabled');
+    if (storedHaptics !== null) hapticsEnabled = storedHaptics === 'true';
+} catch (e) {}
+
+function toggleHaptics() {
+    hapticsEnabled = !hapticsEnabled;
+    try { localStorage.setItem('bj21_haptics_enabled', hapticsEnabled); } catch (e) {}
+    triggerHaptic('LIGHT');
+}
+
+// Native Capacitor haptics when running in the app shell; navigator.vibrate as
+// the web fallback. Never throws — haptics are decoration, not behaviour.
+function triggerHaptic(style) {
+    if (!hapticsEnabled) return;
+    try {
+        const plugins = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()
+            ? window.Capacitor.Plugins : null;
+        if (plugins && plugins.Haptics) {
+            plugins.Haptics.impact({ style: style || 'MEDIUM' });
+        } else if (navigator.vibrate) {
+            navigator.vibrate(style === 'HEAVY' ? 60 : style === 'LIGHT' ? 8 : 15);
+        }
+    } catch (e) {}
+}
+
+
+/* --- js/firebase.js --- */
+// Lazy, OPTIONAL Firebase auth + Firestore. The core of the app must never
+// depend on this: a signed-out user, a blocked CDN, or no network at all should
+// still get a fully working app — only the social layer goes dark.
+
+// {{FIREBASE_CONFIG}} — replace with the real config object from
+// Firebase Console -> Project settings -> Your apps -> Web app -> SDK setup.
+// This is a public client config (not a secret), but it is still per-project,
+// so it must be filled in per app. sw.js needs the SAME object.
+const firebaseConfig = {{FIREBASE_CONFIG}};
+
+// Nullable on purpose. Every consumer checks `if (!db) return;` — that is what
+// makes "works fully offline without Firebase" true rather than aspirational.
+let auth = null;
+let db = null;
+try {
+    if (typeof firebase === 'undefined') throw new Error('Firebase SDK failed to load (offline or blocked CDN)');
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    try {
+        // Offline cache + cross-tab sync. Rejects when several tabs are open or
+        // the browser doesn't support it — neither is fatal, so swallow it.
+        db.enablePersistence({ synchronizeTabs: true }).catch(function() { /* multi-tab or unsupported */ });
+    } catch (e) { /* older browser — online-only */ }
+} catch (e) {
+    console.warn('Firebase unavailable, continuing in offline mode:', e);
+}
+
+// Wrap EVERY Firestore call. Handles both a synchronous throw and a rejected
+// promise, so a backend failure can never break a UI flow; the optional
+// `fallback` receives the error if the caller wants to react. Keep verbatim.
+function firebaseSafe(operation, fallback) {
+    try {
+        const result = operation();
+        if (result && typeof result.catch === 'function') {
+            return result.catch(function(err) {
+                if (typeof fallback === 'function') fallback(err);
+                return null;
+            });
+        }
+        return result;
+    } catch (err) {
+        if (typeof fallback === 'function') fallback(err);
+        return null;
+    }
+}
+
+// --- Remote feature flags (admin-controlled via the config/features doc) ---
+// Lets a feature be killed in production without a redeploy. DEFAULT_FEATURES
+// is the offline/first-paint answer; the remote doc merges over it when it
+// arrives. APP-SPECIFIC: replace these with this app's real toggles.
+const DEFAULT_FEATURES = {
+    social: true,        // friends / invites
+    leaderboard: true,
+    push: true
+};
+window.bj21Features = Object.assign({}, DEFAULT_FEATURES);
+
+// Called twice: once immediately with defaults (so the UI is never blank while
+// the network round-trips) and again when the remote doc lands.
+function applyFeatureFlags() {
+    const f = window.bj21Features;
+    // APP-SPECIFIC: hide/show the surfaces each flag governs.
+    const navSocial = document.getElementById('nav-social');
+    if (navSocial) navSocial.classList.toggle('hidden', !f.social);
+}
+
+function loadFeatureConfig() {
+    applyFeatureFlags();
+    if (!db) return;
+    firebaseSafe(function() {
+        return db.collection('config').doc('features').get().then(function(doc) {
+            if (doc.exists) {
+                window.bj21Features = Object.assign({}, DEFAULT_FEATURES, doc.data());
+            }
+            applyFeatureFlags();
+        });
+    });
+}
+loadFeatureConfig();
+
+// --- Share links ---
+// {{SHARE_BASE_URL}} — the canonical public URL, e.g. the GitHub Pages one.
+// Needed because inside the native shell window.location is capacitor://… or
+// https://localhost, neither of which is shareable.
+const SHARE_BASE_URL = '{{SHARE_BASE_URL}}';
+
+function getShareBaseUrl() {
+    const origin = window.location.origin || '';
+    if (origin === 'https://localhost' || origin.startsWith('capacitor://')) {
+        return SHARE_BASE_URL;
+    }
+    return origin + window.location.pathname;
+}
+
+// Charset excludes I/O/0/1 — codes get read aloud, typed from screenshots and
+// re-keyed by hand, so ambiguous glyphs cost real joins.
+const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function generateRoomCode() {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
+    }
+    return code;
+}
+
+function isNativeApp() {
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+window.isNativeApp = isNativeApp;
+
+// Sign-in can be triggered from #signin-modal OR from an onboarding overlay —
+// surface the error in whichever is actually visible, otherwise a failure
+// during onboarding is completely silent. Add ids here as entry points grow.
+function clearSignInErrors() {
+    ['signin-error', 'onboarding-signin-error'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+}
+
+function showSignInError(message) {
+    ['signin-error', 'onboarding-signin-error'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = message; el.classList.remove('hidden'); }
+    });
+}
+
+function signInWithGoogle() {
+    clearSignInErrors();
+
+    if (isNativeApp()) {
+        // Firebase's web popup/redirect auth does not work inside a native
+        // WebView (no real popup window, no https origin). Use the native
+        // Google Sign-In plugin, then hand its ID token to the Firebase JS SDK
+        // so auth.currentUser and the Firestore security rules see the SAME
+        // session as the web path.
+        window.Capacitor.Plugins.FirebaseAuthentication.signInWithGoogle().then(function(result) {
+            const idToken = result && result.credential && result.credential.idToken;
+            if (!idToken) throw new Error('No ID token returned from Google sign-in.');
+            const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+            return auth.signInWithCredential(credential);
+        }).catch(function(err) {
+            showSignInError(err.message || String(err));
+        });
+        return;
+    }
+
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    // Popup first, redirect as fallback: iOS Safari and in-app browsers block
+    // popups outright, and a blocked popup otherwise looks like a dead button.
+    auth.signInWithPopup(provider).catch(function(popupErr) {
+        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/popup-closed-by-user') {
+            auth.signInWithRedirect(provider).catch(function(redirectErr) {
+                showSignInError(redirectErr.message);
+            });
+        } else {
+            showSignInError(popupErr.message);
+        }
+    });
+}
+
+function signOutUser() {
+    if (isNativeApp()) {
+        firebaseSafe(function() { return window.Capacitor.Plugins.FirebaseAuthentication.signOut(); });
+    }
+    if (auth) auth.signOut();
+}
+window.signOutUser = signOutUser;
+
+// Completes the redirect leg of the popup-fallback above on page load.
+if (auth) {
+    auth.getRedirectResult().catch(function(err) {
+        if (err && err.code !== 'auth/no-current-user') {
+            showSignInError(err.message);
+        }
+    });
+}
+
+// The user profile document. APP-SPECIFIC FIELDS GO HERE.
+// `score` is the generic stand-in for whatever single number this app ranks
+// people by (points, streak, net profit, minutes...). Whatever you call it,
+// keep ONE canonical numeric field: the leaderboard UI, the friends ranking and
+// scripts/push/ all read the same one.
+// `updatedAt` is load-bearing — the poller's incremental queries are
+// `where('updatedAt', '>', since)`, so every write that should trigger a
+// notification MUST stamp it.
+function logUserToFirestore(user) {
+    const ref = db.collection('users').doc(user.uid);
+    return ref.set({
+        uid: user.uid,
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
+        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        // APP-SPECIFIC: add profile fields here (level, avatar, preferences…)
+    }, { merge: true }).then(function() {
+        return ref.get();
+    }).then(function(doc) {
+        const data = doc.exists ? doc.data() : {};
+        // Every user gets a stable invite code on first sign-in.
+        if (!data.referralCode) {
+            const code = generateRoomCode();
+            return ref.update({ referralCode: code }).then(function() {
+                window.bj21UserDoc = Object.assign({}, data, { referralCode: code });
+            });
+        }
+        window.bj21UserDoc = data;
+    });
+}
+
+// Pushes the app's canonical ranking number to the profile doc. Call this
+// whenever the score changes. APP-SPECIFIC: rename `score` to suit, but keep
+// the updatedAt stamp — the poller depends on it.
+function pushScore(score) {
+    if (!db || !window.bj21User) return;
+    firebaseSafe(function() {
+        return db.collection('users').doc(window.bj21User.uid).set({
+            score: score,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    });
+}
+window.pushScore = pushScore;
+
+let _wasSignedIn = false;
+
+// --- Auth fan-out ---
+// The one place social features are started and stopped. Keep the two branches
+// SYMMETRIC: anything started in the signed-in branch must have a matching
+// stop/cleanup in the signed-out branch, or listeners leak across sessions and
+// a second user sees the first user's data.
+if (auth) {
+    auth.onAuthStateChanged(function(user) {
+        // Signals that Firebase has SETTLED the session. Before this fires,
+        // window.bj21User is null even for a signed-in returning
+        // user — so a deep link arriving at DOMContentLoaded must not read
+        // "no user" as "signed out" and pop the sign-in modal.
+        window._authResolved = true;
+        window.bj21User = user || null;
+
+        if (window.closeSignInModal) closeSignInModal();
+        if (window.updateAccountUI) updateAccountUI();
+
+        if (user) {
+            _wasSignedIn = true;
+            firebaseSafe(function() { return logUserToFirestore(user); });
+
+            // Ask for push permission once, if onboarding never did.
+            var pushAlreadyAsked = false;
+            try { pushAlreadyAsked = localStorage.getItem('bj21_push_permission_asked') === '1'; } catch (e) {}
+            if (!pushAlreadyAsked && window.bj21Features.push) {
+                firebaseSafe(function() { return registerForPushNotifications(); });
+            }
+
+            if (window.bj21Features.social) {
+                if (window.loadFriends) loadFriends();
+                if (window.startPresence) startPresence();
+            }
+            if (window.bj21Features.leaderboard && window.subscribeLeaderboard) subscribeLeaderboard();
+
+            // Replay any deep link that arrived before auth settled.
+            if (window._pendingInviteCode && window.addFriendByInviteCode) {
+                var code = window._pendingInviteCode;
+                window._pendingInviteCode = null;
+                addFriendByInviteCode(code);
+            }
+        } else {
+            // SYMMETRIC teardown — one line here per start above.
+            if (window.cleanupFriendsListeners) cleanupFriendsListeners();
+            if (window.stopPresence) stopPresence();
+            if (window.cleanupLeaderboard) cleanupLeaderboard();
+
+            // A shared link that landed before auth settled: now that we know
+            // the visitor is genuinely signed out, ask them to sign in. The
+            // code stays parked and is replayed above on success.
+            if (window._pendingInviteCode) {
+                if (window.openSignInModal) openSignInModal();
+                if (window.showToast) showToast('Sign in to continue');
+            }
+
+            // Native only: on a REAL sign-out (not the initial unauthenticated
+            // state at cold start) re-show the sign-in step so the user can log
+            // back in without restarting the app.
+            if (_wasSignedIn && isNativeApp() && window.showOnboardingForReauth) {
+                _wasSignedIn = false;
+                showOnboardingForReauth();
+            }
+        }
+    });
+}
+
+
+/* --- js/push.js --- */
+// Push notifications — native (Android/iOS via Capacitor) + web (Firebase
+// Messaging + VAPID).
+// Depends on: firebaseSafe()/db from js/firebase.js, window.bj21User
+// from auth.onAuthStateChanged.
+//
+// Firestore schema:
+//   users/{uid}/fcmTokens/{token} = { token, platform, updatedAt }
+//   users/{uid}.notificationPrefs.<category>
+// Categories must match the CATEGORY constants used by scripts/push/*.js.
+
+// {{VAPID_KEY}} — Firebase Console -> Project settings -> Cloud Messaging ->
+// Web Push certificates -> Key pair. Public key, safe to ship, but per-project.
+const VAPID_KEY = '{{VAPID_KEY}}';
+
+function registerForPushNotifications() {
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        // NATIVE path (Android / iOS via Capacitor). The plugin owns the OS
+        // permission dialog; the token arrives asynchronously on the
+        // 'registration' listener below, not from this call.
+        const PushNotifications = window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+        if (!PushNotifications) return;
+        PushNotifications.requestPermissions().then(function(result) {
+            if (result && result.receive === 'granted') PushNotifications.register();
+        }).catch(function(err) { console.warn('Push permission request failed:', err); });
+        return;
+    }
+
+    // WEB path — Firebase Messaging + VAPID. sw.js (registered by js/pwa.js)
+    // already imports firebase-messaging-compat and handles onBackgroundMessage,
+    // so the token must be bound to THAT registration.
+    if (typeof firebase === 'undefined' || !firebase.messaging) return;
+    Notification.requestPermission().then(function(permission) {
+        if (permission !== 'granted') return;
+        return navigator.serviceWorker.ready.then(function(swReg) {
+            return firebase.messaging().getToken({
+                vapidKey: VAPID_KEY,
+                serviceWorkerRegistration: swReg
+            });
+        }).then(function(token) {
+            if (token) saveFcmToken(token, 'web');
+        });
+    }).catch(function(err) { console.warn('Web push registration failed:', err); });
+
+    try { localStorage.setItem('bj21_push_permission_asked', '1'); } catch (e) {}
+}
+window.registerForPushNotifications = registerForPushNotifications;
+
+// Native always supports push; on web it depends on the browser (Safari only
+// exposes it to installed PWAs, and firebase.messaging bails out entirely in
+// unsupported ones). js/tabs.js uses this to decide whether the Settings
+// notification panel is worth showing at all.
+function isPushSupported() {
+    if (window.isNativeApp && isNativeApp()) return true;
+    return !!(window.Notification && navigator.serviceWorker &&
+        typeof firebase !== 'undefined' && firebase.messaging &&
+        firebase.messaging.isSupported && firebase.messaging.isSupported());
+}
+window.isPushSupported = isPushSupported;
+
+// One doc per device token, keyed BY the token — re-registering the same device
+// is idempotent, and scripts/lib/sendPush.js deletes docs whose token FCM
+// reports as unregistered.
+function saveFcmToken(token, platform) {
+    if (!window.bj21User || typeof db === 'undefined' || !db) return;
+    var p = platform || (window.Capacitor && window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'web');
+    firebaseSafe(function() {
+        return db.collection('users').doc(window.bj21User.uid)
+            .collection('fcmTokens').doc(token)
+            .set({
+                token: token,
+                platform: p,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+    });
+}
+
+// Per-category mute. Absent means enabled — sendPush.js only skips on an
+// explicit `false`, so a brand-new category is opt-out, not opt-in.
+function setNotificationPref(category, enabled) {
+    if (!window.bj21User || typeof db === 'undefined' || !db) return;
+    const prefs = {};
+    prefs[category] = !!enabled;
+    firebaseSafe(function() {
+        return db.collection('users').doc(window.bj21User.uid)
+            .set({ notificationPrefs: prefs }, { merge: true });
+    });
+}
+window.setNotificationPref = setNotificationPref;
+
+function initPushListeners() {
+    if (!window.Capacitor || !window.Capacitor.isNativePlatform || !window.Capacitor.isNativePlatform()) {
+        return;
+    }
+    const PushNotifications = window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+    if (!PushNotifications) return;
+
+    PushNotifications.addListener('registration', function(token) {
+        if (token && token.value) saveFcmToken(token.value);
+    });
+
+    PushNotifications.addListener('registrationError', function(err) {
+        console.warn('Push registration error:', err);
+    });
+
+    // Tap handling. Start minimal — land on the screen where the notified
+    // content lives — and only add per-category routing once categories
+    // actually surface on different screens.
+    PushNotifications.addListener('pushNotificationActionPerformed', function() {
+        if (window.showScreen) showScreen('home');
+    });
+}
+initPushListeners();
+
+
+/* --- js/presence.js --- */
+// Presence — a 60s heartbeat writing users/{uid}.lastSeen, read back through
+// isOnline() with a 2-minute window.
+//
+// Deliberately NOT Firebase Realtime Database onDisconnect: this stack is
+// Firestore-only, and a coarse "seen in the last two minutes" dot is worth far
+// less than a second database and its rules.
+//
+// Started/stopped from the auth fan-out in js/firebase.js (startPresence /
+// stopPresence) — keep both sides symmetric or the interval outlives sign-out.
+
+let presenceInterval = null;
+
+const HEARTBEAT_MS = 60000;   // write cadence
+const ONLINE_WINDOW_MS = 120000; // must be > HEARTBEAT_MS so a user is never
+                                 // shown offline between two healthy beats
+
+function _writeLastSeen(uid) {
+    return firebaseSafe(function() {
+        return db.collection('users').doc(uid).set({
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    });
+}
+
+function startPresence() {
+    const user = window.bj21User;
+    if (!user || !db) return;
+
+    _writeLastSeen(user.uid);
+
+    if (presenceInterval) clearInterval(presenceInterval);
+    presenceInterval = setInterval(function() {
+        const current = window.bj21User;
+        // Self-healing: if the session ended without stopPresence() running,
+        // the next tick tears the interval down itself.
+        if (!current) { stopPresence(); return; }
+        _writeLastSeen(current.uid);
+    }, HEARTBEAT_MS);
+}
+window.startPresence = startPresence;
+
+function stopPresence() {
+    if (presenceInterval) {
+        clearInterval(presenceInterval);
+        presenceInterval = null;
+    }
+}
+window.stopPresence = stopPresence;
+
+// Accepts a Firestore Timestamp, a Date, or epoch millis — callers get lastSeen
+// from snapshots, from cached plain objects, and from test fixtures.
+function isOnline(lastSeen) {
+    if (!lastSeen) return false;
+    if (lastSeen.toDate) lastSeen = lastSeen.toDate();
+    if (typeof lastSeen === 'number' || lastSeen instanceof Date) {
+        const ms = typeof lastSeen === 'number' ? lastSeen : lastSeen.getTime();
+        return (Date.now() - ms) < ONLINE_WINDOW_MS;
+    }
+    return false;
+}
+window.isOnline = isOnline;
+
+// Capacitor lifecycle: beat immediately on foreground so a returning user shows
+// online without waiting up to 60s for the next tick.
+document.addEventListener('resume', function() {
+    const user = window.bj21User;
+    if (!user || !db) return;
+    _writeLastSeen(user.uid);
+});
+
+// On background, do nothing on purpose — let the last heartbeat age out of the
+// ONLINE_WINDOW_MS naturally. Writing an explicit "offline" marker would cost a
+// write on every app switch and still be wrong when the app is killed outright.
+document.addEventListener('pause', function() {});
+
+
+/* --- js/blackjack.js --- */
+// The app's core feature: single-player Blackjack vs. a dealer, 6-deck shoe.
+// Depends only on js/ui.js (showToast/triggerHaptic, guaranteed to load first)
+// and reaches into js/firebase.js's pushScore() through the optional-module
+// guard, since Firebase may be absent or the player may be signed out — the
+// game must be fully playable offline either way.
+
+const BJ_SUITS = ['♠', '♥', '♦', '♣']; // spade, heart, diamond, club
+const BJ_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const BJ_DECK_COUNT = 6;
+// Reshuffle once the shoe drops below one deck's worth of cards, checked only
+// between hands (never mid-hand, so a hand never runs out of cards). Real
+// tables cut the shoe at ~75-80% penetration with a physical card; this is
+// the same idea without needing one.
+const BJ_RESHUFFLE_THRESHOLD = 52;
+const BJ_STARTING_CHIPS = 1000;
+const BJ_CHIPS_KEY = 'bj21_chips';
+const BJ_STATS_KEY = 'bj21_stats';
+
+let bjShoe = [];
+let bjChips = BJ_STARTING_CHIPS;
+let bjStats = null;
+let bjPhase = 'betting'; // betting -> playing -> dealer -> settlement -> betting
+let bjCurrentBet = 0;
+let bjDealerHand = [];
+let bjHands = []; // [{ cards, bet, status, isDoubled }] — status: active|stood|busted|blackjack
+let bjActiveHandIndex = 0;
+
+// --- Persistence ---
+
+function bjLoadChips() {
+    try {
+        const raw = localStorage.getItem(BJ_CHIPS_KEY);
+        const n = raw === null ? NaN : parseInt(raw, 10);
+        return isNaN(n) ? BJ_STARTING_CHIPS : n;
+    } catch (e) {
+        return BJ_STARTING_CHIPS;
+    }
+}
+
+function bjSaveChips() {
+    window.bj21Chips = bjChips;
+    try { localStorage.setItem(BJ_CHIPS_KEY, String(bjChips)); } catch (e) {}
+}
+
+function bjLoadStats() {
+    let saved = null;
+    try {
+        const raw = localStorage.getItem(BJ_STATS_KEY);
+        if (raw) saved = JSON.parse(raw);
+    } catch (e) {}
+    return Object.assign({
+        handsPlayed: 0, wins: 0, losses: 0, pushes: 0,
+        blackjacks: 0, currentStreak: 0, bestStreak: 0
+    }, saved || {});
+}
+
+// Only the persisted fields are written back out — sessionHands/sessionWins/
+// sessionNet live on the same object (window.bj21Stats) for js/tabs.js to
+// read, but they are intentionally session-only and must reset on reload.
+function bjSaveStats() {
+    try {
+        localStorage.setItem(BJ_STATS_KEY, JSON.stringify({
+            handsPlayed: bjStats.handsPlayed,
+            wins: bjStats.wins,
+            losses: bjStats.losses,
+            pushes: bjStats.pushes,
+            blackjacks: bjStats.blackjacks,
+            currentStreak: bjStats.currentStreak,
+            bestStreak: bjStats.bestStreak
+        }));
+    } catch (e) {}
+}
+
+// --- Shoe ---
+
+function bjBuildShoe() {
+    const shoe = [];
+    for (let d = 0; d < BJ_DECK_COUNT; d++) {
+        BJ_SUITS.forEach(function(suit) {
+            BJ_RANKS.forEach(function(rank) {
+                shoe.push({ rank: rank, suit: suit });
+            });
+        });
+    }
+    for (let i = shoe.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = shoe[i]; shoe[i] = shoe[j]; shoe[j] = tmp;
+    }
+    return shoe;
+}
+
+function bjDrawCard() {
+    if (bjShoe.length === 0) bjShoe = bjBuildShoe();
+    return bjShoe.pop();
+}
+
+// --- Hand value ---
+// Aces count as 11 until that would bust the hand, then drop to 1 one at a
+// time. `soft` (unused externally today, kept for clarity of intent) reports
+// whether an ace is still counted as 11 in the final total.
+function bjHandValue(cards) {
+    let total = 0;
+    let acesAs11 = 0;
+    cards.forEach(function(c) {
+        if (c.rank === 'A') { total += 11; acesAs11++; }
+        else if (c.rank === 'K' || c.rank === 'Q' || c.rank === 'J' || c.rank === '10') total += 10;
+        else total += parseInt(c.rank, 10);
+    });
+    while (total > 21 && acesAs11 > 0) { total -= 10; acesAs11--; }
+    return { value: total, soft: acesAs11 > 0 };
+}
+
+function bjIsBlackjack(cards) {
+    return cards.length === 2 && bjHandValue(cards).value === 21;
+}
+
+// --- Card + table rendering ---
+
+function bjCreateCardEl(card, faceDown) {
+    const el = document.createElement('div');
+    if (faceDown) {
+        el.className = 'bj-card bj-card-back';
+        return el;
+    }
+    const isRed = card.suit === '♥' || card.suit === '♦';
+    el.className = 'bj-card ' + (isRed ? 'bj-card-red' : 'bj-card-black');
+    el.innerHTML =
+        '<span class="bj-card-rank">' + card.rank + '</span>' +
+        '<span class="bj-card-suit">' + card.suit + '</span>';
+    return el;
+}
+
+function bjRenderHandInto(containerId, cards, hideSecondCard) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    cards.forEach(function(card, i) {
+        container.appendChild(bjCreateCardEl(card, !!hideSecondCard && i === 1));
+    });
+}
+
+function bjUpdateChipsDisplay() {
+    const el = document.getElementById('chip-balance');
+    if (el) el.textContent = '$' + bjChips;
+}
+
+function bjSetMessage(text, kind) {
+    const el = document.getElementById('table-message');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'table-message' + (kind ? ' message-' + kind : '');
+}
+
+// Dealer's hole card (2nd card) stays face-down only while the player is
+// still acting — every other phase (dealing a blackjack, dealer's turn,
+// settlement) shows it.
+function bjRenderDealer() {
+    const hideHole = bjPhase === 'playing';
+    bjRenderHandInto('dealer-cards', bjDealerHand, hideHole);
+    const valueEl = document.getElementById('dealer-value');
+    if (!valueEl) return;
+    if (!bjDealerHand.length) { valueEl.textContent = ''; return; }
+    valueEl.textContent = hideHole
+        ? String(bjHandValue([bjDealerHand[0]]).value) + ' + ?'
+        : String(bjHandValue(bjDealerHand).value);
+}
+
+function bjRenderPlayerHand(index) {
+    const hand = bjHands[index];
+    if (!hand) return;
+    const cardsId = index === 0 ? 'player-cards' : 'player-cards-2';
+    const valueId = index === 0 ? 'player-value' : 'player-value-2';
+    bjRenderHandInto(cardsId, hand.cards, false);
+    const valueEl = document.getElementById(valueId);
+    if (valueEl) valueEl.textContent = String(bjHandValue(hand.cards).value);
+}
+
+function bjRenderHands() {
+    bjRenderPlayerHand(0);
+    const hand2Row = document.getElementById('hand-2-row');
+    if (hand2Row) hand2Row.classList.toggle('hidden', bjHands.length < 2);
+    if (bjHands.length > 1) bjRenderPlayerHand(1);
+
+    const hand1Row = document.getElementById('player-hand-row');
+    if (hand1Row) hand1Row.classList.toggle('active-hand', bjPhase === 'playing' && bjActiveHandIndex === 0 && bjHands.length > 1);
+    if (hand2Row) hand2Row.classList.toggle('active-hand', bjPhase === 'playing' && bjActiveHandIndex === 1);
+}
+
+function bjRenderBetPanel() {
+    const betPanel = document.getElementById('bet-panel');
+    const outPanel = document.getElementById('out-of-chips-panel');
+    const actionPanel = document.getElementById('action-panel');
+    const betEl = document.getElementById('current-bet');
+    if (betEl) betEl.textContent = '$' + bjCurrentBet;
+
+    const isBetting = bjPhase === 'betting';
+    const outOfChips = isBetting && bjChips <= 0;
+
+    if (outPanel) outPanel.classList.toggle('hidden', !outOfChips);
+    if (betPanel) betPanel.classList.toggle('hidden', !isBetting || outOfChips);
+    if (actionPanel) actionPanel.classList.toggle('hidden', bjPhase !== 'playing');
+
+    const dealBtn = document.getElementById('btn-deal');
+    if (dealBtn) dealBtn.disabled = bjCurrentBet <= 0;
+}
+
+function bjRenderActionButtons() {
+    const hand = bjHands[bjActiveHandIndex];
+    if (!hand) return;
+    const doubleBtn = document.getElementById('btn-double');
+    const splitBtn = document.getElementById('btn-split');
+    const canDouble = hand.cards.length === 2 && !hand.isDoubled && bjChips >= hand.bet;
+    // Exactly one split per round (v1 scope) — bjHands.length === 1 is enough
+    // to forbid resplitting on EITHER resulting hand once a split happened.
+    const canSplit = bjHands.length === 1 && hand.cards.length === 2 &&
+        hand.cards[0].rank === hand.cards[1].rank && bjChips >= hand.bet;
+    if (doubleBtn) doubleBtn.disabled = !canDouble;
+    if (splitBtn) splitBtn.disabled = !canSplit;
+}
+
+function bjRenderTable() {
+    bjUpdateChipsDisplay();
+    bjRenderDealer();
+    bjRenderHands();
+    bjRenderBetPanel();
+    if (bjPhase === 'playing') bjRenderActionButtons();
+}
+
+// --- Betting ---
+
+function placeBet(amount) {
+    if (bjPhase !== 'betting') return;
+    if (bjChips - bjCurrentBet < amount) { showToast('Not enough chips'); return; }
+    bjCurrentBet += amount;
+    bjRenderBetPanel();
+    triggerHaptic('LIGHT');
+}
+window.placeBet = placeBet;
+
+function clearBet() {
+    if (bjPhase !== 'betting') return;
+    bjCurrentBet = 0;
+    bjRenderBetPanel();
+}
+window.clearBet = clearBet;
+
+function resetBankroll() {
+    bjChips = BJ_STARTING_CHIPS;
+    bjSaveChips();
+    bjUpdateChipsDisplay();
+    bjRenderBetPanel();
+    showToast('Complimentary chips from the house!');
+    triggerHaptic('MEDIUM');
+}
+window.resetBankroll = resetBankroll;
+
+// --- Round flow ---
+
+function dealRound() {
+    if (bjPhase !== 'betting' || bjCurrentBet <= 0 || bjCurrentBet > bjChips) return;
+    if (bjShoe.length < BJ_RESHUFFLE_THRESHOLD) bjShoe = bjBuildShoe();
+
+    bjChips -= bjCurrentBet;
+    bjSaveChips();
+
+    bjHands = [{ cards: [bjDrawCard(), bjDrawCard()], bet: bjCurrentBet, status: 'active', isDoubled: false }];
+    bjDealerHand = [bjDrawCard(), bjDrawCard()];
+    bjActiveHandIndex = 0;
+    bjPhase = 'playing';
+    bjSetMessage('', null);
+    bjRenderTable();
+    triggerHaptic('LIGHT');
+
+    // Naturals resolve immediately, before the player can act — matches how
+    // a real table peeks/reveals blackjacks rather than letting a 21 hit.
+    const playerBJ = bjIsBlackjack(bjHands[0].cards);
+    const dealerBJ = bjIsBlackjack(bjDealerHand);
+    if (playerBJ || dealerBJ) {
+        bjHands[0].status = playerBJ ? 'blackjack' : 'stood';
+        bjFinishRound();
+    }
+}
+window.dealRound = dealRound;
+
+function bjActiveHand() { return bjHands[bjActiveHandIndex]; }
+
+function bjAdvanceHand() {
+    if (bjActiveHandIndex < bjHands.length - 1) {
+        bjActiveHandIndex++;
+        bjRenderTable();
+    } else {
+        bjDealerTurn();
+    }
+}
+
+function playerHit() {
+    if (bjPhase !== 'playing') return;
+    const hand = bjActiveHand();
+    hand.cards.push(bjDrawCard());
+    const v = bjHandValue(hand.cards).value;
+    bjRenderTable();
+    triggerHaptic('LIGHT');
+    if (v > 21) {
+        hand.status = 'busted';
+        showToast('Bust');
+        triggerHaptic('HEAVY');
+        bjAdvanceHand();
+    } else if (v === 21) {
+        hand.status = 'stood';
+        bjAdvanceHand();
+    }
+}
+window.playerHit = playerHit;
+
+function playerStand() {
+    if (bjPhase !== 'playing') return;
+    bjActiveHand().status = 'stood';
+    bjAdvanceHand();
+}
+window.playerStand = playerStand;
+
+function playerDouble() {
+    if (bjPhase !== 'playing') return;
+    const hand = bjActiveHand();
+    if (hand.cards.length !== 2 || hand.isDoubled || bjChips < hand.bet) return;
+    bjChips -= hand.bet;
+    bjSaveChips();
+    hand.bet *= 2;
+    hand.isDoubled = true;
+    hand.cards.push(bjDrawCard());
+    const busted = bjHandValue(hand.cards).value > 21;
+    hand.status = busted ? 'busted' : 'stood';
+    bjRenderTable();
+    triggerHaptic(busted ? 'HEAVY' : 'MEDIUM');
+    bjAdvanceHand();
+}
+window.playerDouble = playerDouble;
+
+function playerSplit() {
+    if (bjPhase !== 'playing') return;
+    const hand = bjActiveHand();
+    if (bjHands.length !== 1 || hand.cards.length !== 2 ||
+        hand.cards[0].rank !== hand.cards[1].rank || bjChips < hand.bet) return;
+
+    bjChips -= hand.bet;
+    bjSaveChips();
+
+    const second = { cards: [hand.cards.pop()], bet: hand.bet, status: 'active', isDoubled: false };
+    hand.cards.push(bjDrawCard());
+    second.cards.push(bjDrawCard());
+    bjHands.push(second);
+    bjRenderTable();
+    triggerHaptic('MEDIUM');
+}
+window.playerSplit = playerSplit;
+
+function bjDealerTurn() {
+    bjPhase = 'dealer';
+    bjRenderTable();
+    // S17 (stand on all 17s, including soft 17) rather than H17 — same payout
+    // shape, simpler to implement and reason about correctly for a v1.
+    while (bjHandValue(bjDealerHand).value < 17) {
+        bjDealerHand.push(bjDrawCard());
+    }
+    bjFinishRound();
+}
+
+function bjFinishRound() {
+    bjPhase = 'settlement';
+    const dealerBJ = bjIsBlackjack(bjDealerHand);
+    const dealerValue = bjHandValue(bjDealerHand).value;
+    const dealerBusted = dealerValue > 21;
+
+    let anyWin = false;
+    let anyBlackjack = false;
+    let allLose = true;
+
+    bjHands.forEach(function(hand) {
+        let outcome;
+        if (hand.status === 'blackjack') {
+            outcome = dealerBJ ? 'push' : 'blackjack';
+        } else if (hand.status === 'busted') {
+            outcome = 'lose';
+        } else if (dealerBJ) {
+            outcome = 'lose';
+        } else if (dealerBusted) {
+            outcome = 'win';
+        } else {
+            const pv = bjHandValue(hand.cards).value;
+            outcome = pv > dealerValue ? 'win' : pv < dealerValue ? 'lose' : 'push';
+        }
+
+        // Round DOWN on the 3:2 payout fraction so the house never hands out
+        // a chip it doesn't have — matches how real tables handle odd bets.
+        let payout = 0;
+        if (outcome === 'blackjack') payout = Math.floor(hand.bet * 2.5);
+        else if (outcome === 'win') payout = hand.bet * 2;
+        else if (outcome === 'push') payout = hand.bet;
+        bjChips += payout;
+
+        bjStats.handsPlayed++;
+        bjStats.sessionHands++;
+        bjStats.sessionNet += payout - hand.bet;
+
+        if (outcome === 'win' || outcome === 'blackjack') {
+            bjStats.wins++;
+            bjStats.sessionWins++;
+            bjStats.currentStreak++;
+            bjStats.bestStreak = Math.max(bjStats.bestStreak, bjStats.currentStreak);
+            anyWin = true;
+            allLose = false;
+        } else if (outcome === 'push') {
+            bjStats.pushes++;
+            allLose = false;
+        } else {
+            bjStats.losses++;
+            bjStats.currentStreak = 0;
+        }
+        if (outcome === 'blackjack') { bjStats.blackjacks++; anyBlackjack = true; }
+    });
+
+    bjSaveChips();
+    bjSaveStats();
+
+    // Reveal the dealer's hole card and final hand values before announcing
+    // the outcome. bjHands/bjDealerHand are deliberately left populated below
+    // (only bet/phase state resets) so the finished table stays on screen
+    // until the next Deal, instead of flashing empty at the betting screen.
+    bjRenderDealer();
+    bjRenderHands();
+
+    let message, kind;
+    if (anyBlackjack) { message = 'Blackjack!'; kind = 'win'; }
+    else if (anyWin) { message = 'You win'; kind = 'win'; }
+    else if (allLose) {
+        message = bjHands.every(function(h) { return h.status === 'busted'; }) ? 'Bust' : 'Dealer wins';
+        kind = 'lose';
+    } else {
+        message = 'Push'; kind = 'push';
+    }
+    bjSetMessage(message, kind);
+    triggerHaptic(anyWin ? 'MEDIUM' : allLose ? 'HEAVY' : 'LIGHT');
+
+    // Optional and best-effort: chips ARE this app's canonical leaderboard
+    // number, but a signed-out player or a blocked Firebase CDN must never
+    // block settlement — pushScore() itself no-ops without `db`/`bj21User`.
+    if (window.bj21User && window.pushScore) pushScore(bjChips);
+
+    bjPhase = 'betting';
+    bjCurrentBet = 0;
+    bjActiveHandIndex = 0;
+    bjUpdateChipsDisplay();
+    bjRenderBetPanel();
+}
+
+function initBlackjack() {
+    bjChips = bjLoadChips();
+    bjStats = bjLoadStats();
+    // Session-only counters live on the same object as the persisted stats
+    // (window.bj21Stats) so js/tabs.js has one shape to read, but they must
+    // never be written back by bjSaveStats().
+    bjStats.sessionHands = 0;
+    bjStats.sessionWins = 0;
+    bjStats.sessionNet = 0;
+    window.bj21Stats = bjStats;
+    window.bj21Chips = bjChips;
+
+    bjShoe = bjBuildShoe();
+    bjPhase = 'betting';
+    bjCurrentBet = 0;
+    bjDealerHand = [];
+    bjHands = [];
+    bjSetMessage('Place your bet to begin', null);
+    bjRenderTable();
+}
+window.initBlackjack = initBlackjack;
+
+
+/* --- js/tabs.js --- */
+// Screen switching, sub-tabs, theming, and the app's single bootstrap.
+// Second-to-last in build.js jsFiles (only js/pwa.js comes after), because the
+// DOMContentLoaded handler at the bottom calls into every other module.
+
+// --- CONVENTION 1: screens ---
+// One entry per <section id="screen-X"> / <button id="nav-X">. showScreen()
+// toggles `active` on BOTH in lockstep, so the id suffixes must match the name
+// passed here and used in index.html's onclick="showScreen('x')".
+const SCREENS = ['home', 'stats', 'settings'];
+
+function showScreen(name) {
+    SCREENS.forEach(function(s) {
+        const el = document.getElementById('screen-' + s);
+        if (el) el.classList.toggle('active', s === name);
+        const nav = document.getElementById('nav-' + s);
+        if (nav) nav.classList.toggle('active', s === name);
+    });
+    // Re-render on entry rather than keeping every screen live — cheap, and it
+    // guarantees a screen never shows stale data after a background update.
+    if (name === 'stats') renderStatsScreen();
+}
+window.showScreen = showScreen;
+
+// --- CONVENTION 2: sub-tabs ---
+// Within a screen, a segmented control toggles `.selected` on the buttons and
+// `.hidden` on the matching views. One helper drives both so the two can never
+// drift apart.
+//   ids: button = <prefix>-tab-<tab>, view = <prefix>-<tab>-view
+function setSubTab(prefix, tabs, tab) {
+    tabs.forEach(function(t) {
+        const btn = document.getElementById(prefix + '-tab-' + t);
+        if (btn) btn.classList.toggle('selected', t === tab);
+        const view = document.getElementById(prefix + '-' + t + '-view');
+        if (view) view.classList.toggle('hidden', t !== tab);
+    });
+}
+
+const STATS_TABS = ['recent', 'alltime'];
+let statsTab = 'recent';
+
+function setStatsTab(tab) {
+    statsTab = tab;
+    setSubTab('stats', STATS_TABS, tab);
+    renderStatsScreen();
+}
+
+// Reads window.bj21Stats, the single shape js/blackjack.js writes both its
+// persisted fields (handsPlayed, wins, losses, pushes, blackjacks,
+// currentStreak, bestStreak) and its session-only counters (sessionHands,
+// sessionWins, sessionNet) onto.
+function renderStatsScreen() {
+    const stats = window.bj21Stats || {};
+    const setText = function(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
+
+    if (statsTab === 'recent') {
+        setText('stat-session-hands', String(stats.sessionHands || 0));
+        setText('stat-session-wins', String(stats.sessionWins || 0));
+        const net = stats.sessionNet || 0;
+        setText('stat-session-net', (net > 0 ? '+$' : '$') + net);
+    } else {
+        const handsPlayed = stats.handsPlayed || 0;
+        const winRate = handsPlayed > 0 ? Math.round((stats.wins || 0) / handsPlayed * 100) : 0;
+        setText('stat-hands-played', String(handsPlayed));
+        setText('stat-win-rate', winRate + '%');
+        setText('stat-blackjacks', String(stats.blackjacks || 0));
+        setText('stat-current-streak', String(stats.currentStreak || 0));
+        setText('stat-best-streak', String(stats.bestStreak || 0));
+    }
+}
+
+// --- CONVENTION 3: themes ---
+// The first entry is the default and adds NO body class; every other theme adds
+// `body.theme-<name>`, matching the override blocks in styles/tokens.css.
+// Persisted under localStorage['bj21_theme'].
+const THEMES = ['default', 'ocean', 'ember'];
+const THEME_STORAGE_KEY = 'bj21_theme';
+
+let currentTheme = THEMES[0];
+try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved && THEMES.includes(saved)) currentTheme = saved;
+} catch (e) {}
+
+function _paintTheme() {
+    THEMES.slice(1).forEach(function(t) { document.body.classList.remove('theme-' + t); });
+    if (currentTheme !== THEMES[0]) document.body.classList.add('theme-' + currentTheme);
+    THEMES.forEach(function(t) {
+        const btn = document.getElementById('theme-' + t);
+        if (btn) btn.classList.toggle('selected', t === currentTheme);
+    });
+}
+
+function setTheme(theme) {
+    if (!THEMES.includes(theme) || theme === currentTheme) return;
+    currentTheme = theme;
+    try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch (e) {}
+    _paintTheme();
+    triggerHaptic('LIGHT');
+}
+
+// Applied on boot from the persisted value, before first paint of the screens.
+function applyTheme() { _paintTheme(); }
+
+// --- Overlays ---
+// Every modal and sheet in the app is shown/hidden with the same `.hidden`
+// utility — never inline styles.
+function openModal(id) { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); }
+function closeModal(id) { const el = document.getElementById(id); if (el) el.classList.add('hidden'); }
+function openSheet(id) { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); }
+function closeSheet(id) { const el = document.getElementById(id); if (el) el.classList.add('hidden'); }
+window.openSheet = openSheet;
+window.closeSheet = closeSheet;
+
+// js/firebase.js calls closeSignInModal() from onAuthStateChanged.
+function openSignInModal() { openModal('signin-modal'); }
+function closeSignInModal() { closeModal('signin-modal'); }
+window.openSignInModal = openSignInModal;
+window.closeSignInModal = closeSignInModal;
+
+function updateAccountUI() {
+    const user = window.bj21User;
+    const signedOut = document.getElementById('account-signed-out');
+    const signedIn = document.getElementById('account-signed-in');
+    if (!signedOut || !signedIn) return;
+    signedOut.classList.toggle('hidden', !!user);
+    signedIn.classList.toggle('hidden', !user);
+    if (user) {
+        const nameEl = document.getElementById('account-display-name');
+        if (nameEl) nameEl.textContent = user.displayName || 'Signed in';
+    }
+}
+window.updateAccountUI = updateAccountUI;
+
+// --- Settings ---
+const NOTIFICATION_PREF_CATEGORIES = ['social', 'leaderboard', 'dailyReminder'];
+
+function initSettingsScreen() {
+    initNotificationSettings();
+}
+
+function initNotificationSettings() {
+    const panel = document.getElementById('settings-notifications-panel');
+    if (!panel) return;
+    // Gated on push SUPPORT, not on being a native app: web push works too
+    // (Firebase Messaging + VAPID, see js/push.js), and gating on native would
+    // leave browser users with no way to enable or mute notifications.
+    const supported = window.isPushSupported
+        ? isPushSupported()
+        : !!(window.isNativeApp && isNativeApp());
+    panel.classList.toggle('hidden', !supported);
+    if (!supported) return;
+
+    const enableBtn = document.getElementById('settings-notifications-enable');
+    if (enableBtn) {
+        enableBtn.onclick = function() {
+            if (window.registerForPushNotifications) registerForPushNotifications();
+        };
+    }
+
+    const prefs = (window.bj21UserDoc && window.bj21UserDoc.notificationPrefs) || {};
+    NOTIFICATION_PREF_CATEGORIES.forEach(function(category) {
+        const toggle = document.getElementById('settings-notif-' + category);
+        if (!toggle) return;
+        toggle.checked = prefs[category] !== false; // default ON
+        toggle.onchange = function() {
+            if (window.setNotificationPref) setNotificationPref(category, toggle.checked);
+        };
+    });
+}
+
+// --- Native deep links ---
+// Handles blackjack21://open?ref=CODE / ?join=CODE while running inside the
+// Capacitor shell: merge the scheme URL's query params into the page URL, then
+// reuse the exact same handlers the web build already uses.
+function applyNativeDeepLinkUrl(rawUrl) {
+    try {
+        var incoming = new URL(rawUrl);
+        var target = new URL(window.location.href);
+        incoming.searchParams.forEach(function(value, key) {
+            target.searchParams.set(key, value);
+        });
+        window.history.replaceState({}, '', target);
+        if (window.handleIncomingInvite) handleIncomingInvite();
+        if (window.handleJoinDeepLink) handleJoinDeepLink();
+    } catch (e) {}
+}
+
+function initNativeDeepLinkHandling() {
+    var CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (!CapApp) return;
+    // Cold start: the app was launched directly via the custom scheme.
+    CapApp.getLaunchUrl().then(function(result) {
+        if (result && result.url) applyNativeDeepLinkUrl(result.url);
+    }).catch(function() {});
+    // Warm start: the app was already running when the scheme URL was opened.
+    CapApp.addListener('appUrlOpen', function(data) {
+        applyNativeDeepLinkUrl(data.url);
+    });
+}
+
+// --- CONVENTION 4: the single bootstrap ---
+// EXACTLY ONE DOMContentLoaded listener in the whole app, here. Every module's
+// init runs from this list, in an order you can read top to bottom.
+//
+// Optional-module guard: `if (window.fn) fn();`. Because build.js concatenates
+// files into one scope with no imports, a module that is not in jsFiles (yet,
+// or on this platform) simply leaves its globals undefined — the guard turns a
+// hard ReferenceError into a silently skipped feature. Anything OPTIONAL is
+// guarded; anything this template guarantees is called bare, so a genuine
+// breakage is loud rather than silent.
+document.addEventListener('DOMContentLoaded', function() {
+    applyTheme();
+    initSettingsScreen();
+    updateAccountUI();
+
+    // APP-SPECIFIC: initialise the app's core feature module here.
+    if (window.initBlackjack) initBlackjack();
+
+    if (window.initOnboarding) initOnboarding(); else showScreen(SCREENS[0]);
+    initPwa();
+
+    // Web/PWA deep links (?ref=CODE, ?join=CODE). These must run on web too —
+    // wiring them only into applyNativeDeepLinkUrl() silently drops every
+    // shared link opened in a browser.
+    if (window.handleIncomingInvite) handleIncomingInvite();
+    if (window.handleJoinDeepLink) handleJoinDeepLink();
+    initNativeDeepLinkHandling();
+});
+
+
+/* --- js/pwa.js --- */
+// PWA: service worker registration + install prompt.
+// Last in build.js jsFiles. initPwa() is called from the DOMContentLoaded
+// bootstrap in js/tabs.js; pwaRegisterSw() runs immediately at the bottom
+// because push registration needs navigator.serviceWorker.ready as early as
+// possible.
+
+const INSTALL_PROMPT_AFTER_VISITS = 3;
+
+let pwaDeferredInstall = null;
+
+// Service workers are refused on any non-secure origin. Guarding here rather
+// than letting register() reject keeps file:// and http:// dev servers quiet.
+function pwaCanUseSw() {
+    return 'serviceWorker' in navigator &&
+        (location.protocol === 'https:' || location.hostname === 'localhost');
+}
+
+function pwaRegisterSw() {
+    if (!pwaCanUseSw()) return;
+    navigator.serviceWorker.register('sw.js').catch(function() { /* offline / unsupported */ });
+}
+
+// One increment per calendar day, not per page load — a user reloading twenty
+// times in one sitting is one visit, so the install prompt tracks genuine
+// return visits.
+function pwaTrackVisit() {
+    try {
+        const today = new Date().toISOString().slice(0, 10);
+        const raw = localStorage.getItem('bj21_visits');
+        const v = raw ? JSON.parse(raw) : { count: 0, last: '' };
+        if (v.last !== today) {
+            v.count++;
+            v.last = today;
+            localStorage.setItem('bj21_visits', JSON.stringify(v));
+        }
+        return v.count;
+    } catch (e) { return 0; }
+}
+
+function pwaShowBar(id, text, yesLabel, onYes) {
+    if (document.getElementById(id)) return;
+    const bar = document.createElement('div');
+    bar.id = id;
+    bar.className = 'pwa-bar';
+    const yes = document.createElement('button');
+    yes.className = 'pwa-bar-yes';
+    yes.textContent = yesLabel;
+    yes.onclick = function() { bar.remove(); onYes(); };
+    const no = document.createElement('button');
+    no.className = 'pwa-bar-no';
+    no.textContent = '✕';
+    no.onclick = function() { bar.remove(); };
+    const span = document.createElement('span');
+    span.textContent = text;
+    bar.appendChild(span);
+    bar.appendChild(yes);
+    bar.appendChild(no);
+    document.body.appendChild(bar);
+}
+
+// The browser fires this when the app becomes installable. Capture and defer
+// it: prompting on first load converts badly and burns the one-shot event.
+window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    pwaDeferredInstall = e;
+    maybeShowInstallBar();
+});
+
+function maybeShowInstallBar() {
+    if (!pwaDeferredInstall) return;
+    let dismissed = false;
+    try { dismissed = localStorage.getItem('bj21_install_dismissed') === '1'; } catch (e) {}
+    if (dismissed) return;
+    let visits = 0;
+    try { visits = (JSON.parse(localStorage.getItem('bj21_visits')) || {}).count || 0; } catch (e) {}
+    if (visits < INSTALL_PROMPT_AFTER_VISITS) return;
+    pwaShowBar('pwa-install-bar', 'Install Blackjack 21 for quick access', 'Install', function() {
+        pwaDeferredInstall.prompt();
+        pwaDeferredInstall = null;
+    });
+    // Show it once, ever. A repeatedly re-appearing install bar is the fastest
+    // way to make people leave.
+    try { localStorage.setItem('bj21_install_dismissed', '1'); } catch (e) {}
+}
+
+function initPwa() {
+    pwaTrackVisit();
+    maybeShowInstallBar();
+}
+
+pwaRegisterSw();
+
+
+</script>
+</body>
+</html>

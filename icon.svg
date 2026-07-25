@@ -1,0 +1,16 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-shade" cx="50%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#123825"/>
+      <stop offset="100%" stop-color="#051911"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="url(#bg-shade)"/>
+
+  <g transform="rotate(-8 256 256)">
+    <rect x="146" y="96" width="220" height="300" rx="22" fill="#ffffff"/>
+    <path transform="translate(256 210) scale(5.2)" d="M0 -16 C 9 -8, 15 -1, 15 6 C 15 13, 9 18, 0 18 C -9 18, -15 13, -15 6 C -15 -1, -9 -8, 0 -16 Z M0 12 L -5 27 L 5 27 Z" fill="#1a1a1a"/>
+    <text x="256" y="336" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="700" fill="#d4af37">21</text>
+  </g>
+</svg>

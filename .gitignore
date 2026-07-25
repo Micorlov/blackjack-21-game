@@ -1,0 +1,39 @@
+# Scaffolder: rename this file to .gitignore
+
+.claude/
+
+# Node
+node_modules/
+
+# OS / editor cruft
+.DS_Store
+*.bak
+
+# Android build outputs
+android/.gradle/
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/build/
+android/capacitor-android/build/
+android/local.properties
+
+# iOS build outputs
+ios/DerivedData/
+ios/App/build/
+ios/App/Pods/
+
+# Sensitive Android signing/credentials — never commit to a public repo
+android/keystore.properties
+android/app/*.jks
+android/app/*.keystore
+android/app/google-services.json
+
+# Sensitive iOS credentials
+ios/App/GoogleService-Info.plist
+*.p8
+*.p12
+*.mobileprovision
+
+# Service account keys — the push poller reads these from a GitHub secret,
+# never from a committed file
+*service-account*.json

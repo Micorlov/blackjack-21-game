@@ -1,0 +1,17 @@
+{
+  "name": "Blackjack 21",
+  "short_name": "Blackjack 21",
+  "description": "Classic single-player Blackjack against the dealer — 6-deck shoe, splits, doubles, and 3:2 blackjack payouts.",
+  "start_url": "blackjack21.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#051911",
+  "theme_color": "#0a2e1c",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

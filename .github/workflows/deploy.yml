@@ -1,0 +1,38 @@
+# Publishes the repo root to GitHub Pages on every push to main.
+#
+# The whole repo is uploaded as-is — there is no build step here on purpose:
+# blackjack21.html is built locally by `npm run build` and COMMITTED, so what
+# is deployed is exactly what was tested. If you'd rather build in CI, add a
+# setup-node + `npm ci && npm run build` step before upload-pages-artifact.
+#
+# One-time manual setup: GitHub repo Settings -> Pages -> Build and deployment
+# -> Source = "GitHub Actions".
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

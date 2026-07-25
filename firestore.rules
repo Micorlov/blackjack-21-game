@@ -1,0 +1,227 @@
+// Firestore security rules for Blackjack 21.
+//
+// Paste into Firebase Console -> Firestore Database -> Rules (or deploy with
+// `firebase deploy --only firestore:rules`). Client SDKs are subject to these;
+// the Admin SDK used by scripts/push/* BYPASSES them entirely, which is why
+// several collections below are read-only to clients.
+//
+// Replace micorlov@gmail.com with the single admin account's email address.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------
+    // Reusable predicates
+    // ---------------------------------------------------------------------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Admin gate by EMAIL rather than by uid: Firebase Auth tokens carry email
+    // directly, so this stays readable and is easy to keep in sync with the
+    // client-side gate in any admin page. If several admins are needed, use
+    // `request.auth.token.email in ['a@x.com', 'b@x.com']`.
+    function isAdmin() {
+      return signedIn() && request.auth.token.email == 'micorlov@gmail.com';
+    }
+
+    // Only these keys changed, and each changed to the expected value.
+    function onlyChanged(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // ---------------------------------------------------------------------
+    // users/{uid} — the profile document
+    //
+    // Read is open to any signed-in user: friend lists, leaderboards and
+    // invite-code lookups all need to resolve other people's displayName /
+    // photoURL / score. Keep NOTHING private on this doc (no email, no raw
+    // auth data) — put anything sensitive in an owner-only subcollection.
+    // Write is owner-only.
+    // ---------------------------------------------------------------------
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid;
+
+      // -------------------------------------------------------------------
+      // friends/{friendUid} — MUTUAL-WRITE RULE. Read this before "tightening"
+      // it to owner-only.
+      //
+      // A friendship is an EDGE, and the client writes BOTH SIDES of that edge
+      // in a single operation: adding Bob writes users/alice/friends/bob AND
+      // users/bob/friends/alice. There is no server in this stack to reconcile
+      // the second write, so if this rule were owner-only
+      // (`request.auth.uid == uid`) the reciprocal write would be denied and
+      // the friendship would exist in one direction only.
+      //
+      // That failure is SILENT and very easy to ship: the person who clicked
+      // sees their new friend appear immediately, and only the other side is
+      // missing it — usually noticed days later as "my friend added me but I
+      // don't see them".
+      //
+      // So: a user may write into ANOTHER user's friends subcollection, but
+      // only the single document keyed to their OWN uid — which is exactly the
+      // reciprocal edge and nothing else. Reads stay private to the owner.
+      //
+      // Trade-off to accept consciously: anyone who knows your invite code can
+      // add themselves to your friends list with no accept step. That is the
+      // intended product behaviour for link-joined friend circles. If the app
+      // needs approval, model it as a separate `friendRequests` collection and
+      // keep this rule for the accepted edge.
+      // -------------------------------------------------------------------
+      match /friends/{friendUid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow write: if signedIn()
+                     && (request.auth.uid == uid || request.auth.uid == friendUid);
+      }
+
+      // One doc per registered device token, owner-only. notificationPrefs is
+      // just a field on the parent user doc and is already covered above.
+      match /fcmTokens/{token} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // rooms/{roomId} — shared groups joined by code. APPEND-ONLY memberUids.
+    //
+    // Read is open to any signed-in user: join-by-code has to look up a room
+    // the player is not a member of yet. Keep room contents non-sensitive.
+    //
+    // The update rule is the interesting one. Three clauses, each load-bearing:
+    //
+    //  1. hasOnly(['memberUids', 'updatedAt']) — a joiner may touch nothing
+    //     else. NOTE `updatedAt` is listed: the client stamps it on join and
+    //     the poller's incremental query depends on it. A rule that allowed
+    //     only ['memberUids'] denies every join as actually written, which
+    //     looks like a client bug for a long time.
+    //  2. == resource.data.memberUids.concat([uid]) — the new array must be
+    //     the old array with exactly the caller's own uid appended. No
+    //     removals, no reordering, no adding somebody else.
+    //  3. !(uid in resource.data.memberUids) — concat() does not deduplicate,
+    //     so an already-member re-clicking their own invite link would append
+    //     a duplicate. The client must skip the write entirely in that case;
+    //     this clause enforces it.
+    // ---------------------------------------------------------------------
+    match /rooms/{roomId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.memberUids == [request.auth.uid];
+      allow update: if signedIn()
+                    && onlyChanged(['memberUids', 'updatedAt'])
+                    && request.resource.data.memberUids == resource.data.memberUids.concat([request.auth.uid])
+                    && !(request.auth.uid in resource.data.memberUids);
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      // Each member writes only their own entry in the room leaderboard.
+      match /members/{uid} {
+        allow read: if signedIn();
+        allow write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // referralGroups/{code} — everyone who joined via the same invite link
+    // becomes mutual friends with everyone else in the group, not just with
+    // the link owner. `members` is an APPEND-ONLY array of uids, same shape as
+    // the rooms rule above: create with yourself as the sole member, or append
+    // exactly your own uid.
+    // Read is open to signed-in users so a joiner can see who is already in
+    // the group and write the friend edges before appending itself.
+    // ---------------------------------------------------------------------
+    match /referralGroups/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.members == [request.auth.uid];
+      allow update: if signedIn()
+                    && onlyChanged(['members'])
+                    && request.resource.data.members == resource.data.members.concat([request.auth.uid]);
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Leaderboards — one entry doc per user per period. Read by everyone
+    // signed in, written only by the owning user.
+    // ---------------------------------------------------------------------
+    match /leaderboards/{periodKey} {
+      allow read: if signedIn();
+      allow write: if false; // the period doc itself is never client-written
+      match /entries/{uid} {
+        allow read: if signedIn();
+        allow write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // config/{docId} — remote feature flags read by js/firebase.js on load.
+    // Read must stay PUBLIC (not just signed-in): signed-out visitors load the
+    // app too, and gating flags behind auth means their first paint uses stale
+    // defaults. Only the admin account may write.
+    // ---------------------------------------------------------------------
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------------
+    // WRITTEN BY THE ADMIN SDK ONLY — read-only (or invisible) to clients.
+    // The poller bypasses these rules, so `allow write: if false` costs it
+    // nothing while making the collections tamper-proof from the client.
+    // ---------------------------------------------------------------------
+
+    // system/pushCursor — scripts/lib/cursor.js. No client has any business
+    // reading or moving the poller's cursor.
+    match /system/{docId} {
+      allow read, write: if false;
+    }
+
+    // pushLogs/{logId} — scripts/lib/pushLog.js writes one doc per recipient
+    // per notification. Read is ADMIN-ONLY: entries carry display names and
+    // notification bodies for every user, which no player should be able to
+    // enumerate. Append-only — nothing edits or deletes log entries.
+    match /pushLogs/{logId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Permanent award/achievement records, written by the poller only.
+    match /awards/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Default deny. Anything not matched above is inaccessible — add new
+    // collections explicitly rather than loosening this.
+    // ---------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// =========================================================================
+// COMPANION SETUP THAT RULES ALONE DO NOT COVER
+//
+// 1. COLLECTION GROUP INDEXES. Any `collectionGroup('x').where('field', ...)`
+//    query in scripts/push/* needs an explicit collection-group index:
+//    Console -> Firestore Database -> Indexes -> "Collection Group" tab.
+//    Same-collection single-field indexes are automatic; collection-group
+//    scope is NOT. They are free on the Spark plan. Typically needed for:
+//      - collection group `friends`, field `addedAt`, ascending
+//      - collection group `members`, field `updatedAt`, ascending
+//
+// 2. POLLER-OWNED FIELDS — do not hand-edit. scripts/push/* caches "what did
+//    this look like last poll?" on the documents it watches, because a poller
+//    gets no before/after snapshot. All are underscore-prefixed and safe to
+//    delete (the next poll re-seeds them silently, notifying nobody):
+//      - users/{uid}._prevScore
+//      - rooms/{roomId}._prevMemberUids
+//    These are written by the Admin SDK, so they need no client rule — but the
+//    owner-write rule on users/{uid} does technically let a user overwrite
+//    their own cache. That is harmless (worst case: one spurious or missing
+//    notification for themselves).
+// =========================================================================

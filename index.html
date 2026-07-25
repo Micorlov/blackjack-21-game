@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Blackjack 21</title>
+
+    <!--
+      CUSTOM-SCHEME HAND-OFF (optional, keep only if the app has deep links).
+      A shared link tapped inside another app (WhatsApp, Telegram) opens the web
+      page. If the visitor has the native app installed, hand off to it via the
+      custom scheme. Deferred until `load`: firing a location change to an
+      unregistered scheme BEFORE first paint leaves some mobile browsers on a
+      permanent blank page instead of resuming this document.
+    -->
+    <script>
+    (function () {
+        try {
+            var runningInApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+            if (runningInApp) return;
+
+            var params = new URLSearchParams(window.location.search);
+            if (!params.get('ref') && !params.get('join')) return;
+
+            window.addEventListener('load', function () {
+                window.location.href = 'blackjack21://open?' + params.toString();
+            });
+        } catch (e) { /* best-effort — the web experience below still works */ }
+    })();
+    </script>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a2e1c">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!--
+      CONVENTION: build.js replaces this exact comment with every file in its
+      cssFiles array, concatenated in order, inside this single <style> tag.
+      Do not add <link> tags for local stylesheets — they would not survive the
+      single-file build. Keep the comment on its own line, unmodified.
+    -->
+    <style>
+<!-- BUILD_CSS_PLACEHOLDER -->
+</style>
+
+    <!--
+      Firebase compat CDN builds. compat (not modular) on purpose: the whole app
+      is plain script-tag JS with no bundler, and the compat namespace is what
+      js/firebase.js, js/push.js and sw.js all expect. Drop any product you do
+      not use — but firebase-app-compat must stay first, and the set here must
+      match what sw.js importScripts().
+    -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+</head>
+<body>
+    <!--
+      SCREEN CONVENTION
+      One <section id="screen-X" class="screen"> per bottom-nav tab. Exactly one
+      carries `active` on load (the default screen). js/tabs.js showScreen(name)
+      toggles `.active` on #screen-<name> and on #nav-<name> together, so the
+      id suffixes MUST match the string passed to showScreen().
+      CSS: .screen { display: none } / .screen.active { display: block }.
+    -->
+    <div class="app">
+
+        <section id="screen-home" class="screen active">
+            <div class="brandrow">
+                <div class="app-title">Blackjack 21</div>
+                <div class="chip-balance" id="chip-balance">$1000</div>
+            </div>
+
+            <div class="panel felt-table">
+                <div class="table-row dealer-row">
+                    <div class="hand-label">Dealer <span class="hand-value" id="dealer-value"></span></div>
+                    <div class="card-row" id="dealer-cards"></div>
+                </div>
+
+                <div class="table-message" id="table-message"></div>
+
+                <div class="table-row player-row" id="player-hand-row">
+                    <div class="hand-label">You <span class="hand-value" id="player-value"></span></div>
+                    <div class="card-row" id="player-cards"></div>
+                </div>
+
+                <div class="table-row player-row hidden" id="hand-2-row">
+                    <div class="hand-label">Hand 2 <span class="hand-value" id="player-value-2"></span></div>
+                    <div class="card-row" id="player-cards-2"></div>
+                </div>
+            </div>
+
+            <div class="panel bet-panel" id="bet-panel">
+                <div class="bet-display">Bet <span id="current-bet">$0</span></div>
+                <div class="chip-row">
+                    <button class="chip chip-25" onclick="placeBet(25)">$25</button>
+                    <button class="chip chip-50" onclick="placeBet(50)">$50</button>
+                    <button class="chip chip-100" onclick="placeBet(100)">$100</button>
+                    <button class="chip chip-500" onclick="placeBet(500)">$500</button>
+                </div>
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="clearBet()">Clear</button>
+                    <button class="btn-primary" id="btn-deal" onclick="dealRound()">Deal</button>
+                </div>
+            </div>
+
+            <div class="panel action-panel hidden" id="action-panel">
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="playerHit()">Hit</button>
+                    <button class="btn-secondary" onclick="playerStand()">Stand</button>
+                    <button class="btn-secondary" id="btn-double" onclick="playerDouble()">Double</button>
+                    <button class="btn-secondary" id="btn-split" onclick="playerSplit()">Split</button>
+                </div>
+            </div>
+
+            <div class="panel out-of-chips-panel hidden" id="out-of-chips-panel">
+                <div class="section-label">Out of chips</div>
+                <p class="muted">The house extends you a courtesy stack so you can keep playing.</p>
+                <button class="btn-primary" onclick="resetBankroll()">Get 1000 complimentary chips</button>
+            </div>
+        </section>
+
+        <section id="screen-stats" class="screen">
+            <h1 class="screen-title">Stats</h1>
+
+            <!--
+              SUB-TAB CONVENTION (optional, per screen)
+              Buttons carry `.selected`; the matching views are toggled with
+              `.hidden`. js/tabs.js setSubTab() drives both from one array.
+            -->
+            <div class="subtabs">
+                <button class="subtab selected" id="stats-tab-recent" onclick="setStatsTab('recent')">Recent</button>
+                <button class="subtab" id="stats-tab-alltime" onclick="setStatsTab('alltime')">All time</button>
+            </div>
+            <div id="stats-recent-view">
+                <div class="stat-grid">
+                    <div class="panel"><div class="stat-value" id="stat-session-hands">0</div><div class="stat-label">Hands this session</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-session-wins">0</div><div class="stat-label">Wins this session</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-session-net">$0</div><div class="stat-label">Net chips this session</div></div>
+                </div>
+            </div>
+            <div id="stats-alltime-view" class="hidden">
+                <div class="stat-grid">
+                    <div class="panel"><div class="stat-value" id="stat-hands-played">0</div><div class="stat-label">Hands played</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-win-rate">0%</div><div class="stat-label">Win rate</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-blackjacks">0</div><div class="stat-label">Blackjacks</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-current-streak">0</div><div class="stat-label">Current streak</div></div>
+                    <div class="panel"><div class="stat-value" id="stat-best-streak">0</div><div class="stat-label">Best streak</div></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-settings" class="screen">
+            <h1 class="screen-title">Settings</h1>
+
+            <div class="section-label">Account</div>
+            <div class="panel">
+                <!-- Signed-out / signed-in states are swapped with .hidden by
+                     updateAccountUI() in js/tabs.js. -->
+                <div id="account-signed-out">
+                    <button class="btn-primary" onclick="openModal('signin-modal')">Sign in</button>
+                </div>
+                <div id="account-signed-in" class="hidden">
+                    <div id="account-display-name">Signed in</div>
+                    <button class="btn-secondary" onclick="signOutUser()">Sign out</button>
+                </div>
+            </div>
+
+            <div class="section-label">Appearance</div>
+            <div class="panel">
+                <!-- Theme buttons: id MUST be theme-<name> to match js/tabs.js -->
+                <div class="btn-row">
+                    <button class="subtab selected" id="theme-default" onclick="setTheme('default')">Default</button>
+                    <button class="subtab" id="theme-ocean" onclick="setTheme('ocean')">Ocean</button>
+                    <button class="subtab" id="theme-ember" onclick="setTheme('ember')">Ember</button>
+                </div>
+            </div>
+
+            <div class="section-label">Notifications</div>
+            <!-- Hidden entirely when push is unsupported — see initNotificationSettings() -->
+            <div class="panel hidden" id="settings-notifications-panel">
+                <button class="btn-secondary" id="settings-notifications-enable">Enable notifications</button>
+                <label class="row-toggle">
+                    <span>Social</span>
+                    <input type="checkbox" id="settings-notif-social">
+                </label>
+                <label class="row-toggle">
+                    <span>Leaderboard</span>
+                    <input type="checkbox" id="settings-notif-leaderboard">
+                </label>
+                <label class="row-toggle">
+                    <span>Daily reminder</span>
+                    <input type="checkbox" id="settings-notif-dailyReminder">
+                </label>
+            </div>
+        </section>
+
+    </div>
+
+    <!--
+      BOTTOM NAV CONVENTION
+      One .nav-btn per screen, id="nav-<name>", onclick="showScreen('<name>')".
+      The button whose screen has `active` on load must also carry `active`.
+      .bottom-nav is position:fixed; .app reserves space for it via
+      padding-bottom: calc(var(--nav-height) + …) in styles/layout.css.
+    -->
+    <nav class="bottom-nav">
+        <div class="bottom-nav-inner">
+            <button class="nav-btn active" id="nav-home" onclick="showScreen('home')">
+                <span class="nav-icon">●</span>
+                <span>Home</span>
+            </button>
+            <button class="nav-btn" id="nav-stats" onclick="showScreen('stats')">
+                <span class="nav-icon">▤</span>
+                <span>Stats</span>
+            </button>
+            <button class="nav-btn" id="nav-settings" onclick="showScreen('settings')">
+                <span class="nav-icon">⚙</span>
+                <span>Settings</span>
+            </button>
+        </div>
+    </nav>
+
+    <!--
+      MODAL CONVENTION
+      A centered .modal-backdrop > .modal-box, hidden by default with the
+      `.hidden` utility (display:none !important, defined in styles/tokens.css).
+      Show/hide is ALWAYS classList.remove('hidden') / .add('hidden') — never
+      inline style, so a single utility governs every overlay in the app.
+    -->
+    <div class="modal-backdrop hidden" id="signin-modal">
+        <div class="modal-box">
+            <button class="modal-close" onclick="closeModal('signin-modal')">✕</button>
+            <div class="modal-title">Sign in</div>
+            <div class="modal-sub">Sign in to sync your progress and play with friends.</div>
+            <button class="btn-primary" onclick="signInWithGoogle()">Continue with Google</button>
+            <div class="modal-error hidden" id="signin-error"></div>
+        </div>
+    </div>
+
+    <!--
+      CONVENTION: build.js replaces this exact comment with every file in its
+      jsFiles array, concatenated in order, inside this single <script> tag —
+      placed last so the DOM exists before any top-level module code runs.
+    -->
+    <script>
+<!-- BUILD_JS_PLACEHOLDER -->
+</script>
+</body>
+</html>
