@@ -12,7 +12,7 @@
 
 set -e
 
-URL="{{SHARE_BASE_URL}}"
+URL="https://micorlov.github.io/blackjack-21-game/"
 TIMEOUT=15
 
 if [ "$1" = "--wait" ]; then

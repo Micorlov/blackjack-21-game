@@ -22,6 +22,22 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!--
+	  Custom-scheme hand-off: index.html redirects a shared invite link
+	  (?ref=CODE) to blackjack21://open?ref=CODE when the native app is
+	  installed. js/tabs.js's initNativeDeepLinkHandling() picks it up via
+	  Capacitor's App plugin (getLaunchUrl / appUrlOpen). Mirrors the
+	  android:scheme intent-filter added to AndroidManifest.xml.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>blackjack21</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
