@@ -1,0 +1,128 @@
+/* Design tokens + global resets. MUST be the first entry in build.js cssFiles —
+   every other stylesheet reads these custom properties.
+
+   THE PALETTE IS THE THING TO SWAP PER APP. What follows is a deliberately
+   neutral slate placeholder so a new app is legible on day one and obviously
+   un-branded. Replace the --surface-*/--accent-*/--text-* values (and the two
+   theme blocks below) with the app's real palette; leave the *variable names*
+   alone, since layout.css and every feature stylesheet reference them. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    /* Surface ramp — darkest to lightest. Casino felt green. */
+    --surface-900: #051911;
+    --surface-800: #0a2e1c;
+    --surface-700: #123825;
+    --surface-600: #1d4a34;
+
+    --bg-top: var(--surface-800);
+    --bg-bottom: var(--surface-900);
+    --panel: var(--surface-700);
+    --panel-solid: var(--surface-700);
+    --border: var(--surface-600);
+    --border-strong: var(--surface-600);
+
+    /* Accent — the one colour that carries brand identity. Used for the active
+       nav item, primary buttons and selected states. Casino gold. */
+    --accent: #d4af37;
+    --accent-600: #b8942e;
+    --accent-100: #f5e6b8;
+    --accent-dim: rgba(212, 175, 55, 0.14);
+
+    /* Semantic status colours */
+    --positive: #4caf7d;
+    --positive-dim: rgba(76, 175, 125, 0.15);
+    --negative: #e6533f;
+    --negative-dim: rgba(230, 83, 63, 0.12);
+
+    /* Text ramp */
+    --text: #f2f3f5;
+    --text-muted: #b4b8c0;
+    --text-faint: rgba(180, 184, 192, 0.6);
+
+    /* Shape */
+    --radius-lg: 16px;
+    --radius-md: 14px;
+    --radius-sm: 12px;
+
+    /* Height of the fixed bottom nav. layout.css uses this to reserve scroll
+       space at the bottom of .app — change it here, not in two places. */
+    --nav-height: 64px;
+}
+
+/* THEME OVERRIDES
+   Each alternate theme is a `body.theme-<name>` block that re-declares only the
+   variables it changes. js/tabs.js setTheme() adds exactly one of these classes
+   (the default theme adds none) and persists the choice in
+   localStorage['bj21_theme']. To add a theme: add a block here, add
+   the name to the THEMES array in js/tabs.js, and add a `theme-<name>` button
+   in index.html. */
+
+/* --- Midnight theme (blue felt) --- */
+body.theme-ocean {
+    --surface-900: #060e1c;
+    --surface-800: #0c1c32;
+    --surface-700: #142a45;
+    --surface-600: #203e5e;
+    --bg-top: var(--surface-800);
+    --bg-bottom: var(--surface-900);
+    --panel: var(--surface-700);
+    --panel-solid: var(--surface-700);
+    --border: var(--surface-600);
+    --border-strong: var(--surface-600);
+    --accent: #f5c451;
+    --accent-600: #d4a53a;
+    --accent-dim: rgba(245, 196, 81, 0.12);
+    --text: #f0f4f8;
+    --text-muted: #a9b7c4;
+    --text-faint: rgba(169, 183, 196, 0.6);
+}
+
+/* --- Ruby theme (red felt) --- */
+body.theme-ember {
+    --surface-900: #1a0708;
+    --surface-800: #2b0c0d;
+    --surface-700: #3d1416;
+    --surface-600: #5c1e21;
+    --bg-top: var(--surface-800);
+    --bg-bottom: var(--surface-900);
+    --panel: var(--surface-700);
+    --panel-solid: var(--surface-700);
+    --border: var(--surface-600);
+    --border-strong: var(--surface-600);
+    --accent: #ffb457;
+    --accent-600: #d9903c;
+    --accent-dim: rgba(255, 180, 87, 0.12);
+    --text: #f6efe8;
+    --text-muted: #c9b6b6;
+    --text-faint: rgba(201, 182, 182, 0.6);
+    --negative: #ff6b6b;
+    --negative-dim: rgba(255, 107, 107, 0.12);
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: 'Manrope', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    background: linear-gradient(180deg, var(--bg-top), var(--bg-bottom) 60%);
+    min-height: 100vh;
+    color: var(--text);
+    /* touch-action + user-select: makes a web page feel like an app instead of
+       a document — no double-tap zoom, no accidental text selection on taps. */
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+button, input, select {
+    font-family: inherit;
+    color: inherit;
+}
+
+/* THE universal show/hide utility. Every modal, sheet, sub-tab view and
+   feature-flagged element in the app is toggled with classList.toggle('hidden').
+   !important so it always beats a component's own display rule. */
+.hidden { display: none !important; }

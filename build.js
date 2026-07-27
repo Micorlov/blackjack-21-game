@@ -23,6 +23,7 @@ const cssFiles = [
     'styles/tokens.css',    // palette, radii, --nav-height, theme overrides — ALWAYS FIRST
     'styles/layout.css',    // .app / .screen / .bottom-nav / modals / buttons
     'styles/blackjack.css', // felt table, cards, chips, betting/action panels
+    'styles/social.css',    // Friends screen: invite code, add-friend, leaderboard rows
 ];
 
 let combinedCss = '';
@@ -38,13 +39,15 @@ cssFiles.forEach(file => {
 // `if (window.fn) fn();` (see js/tabs.js), and js/tabs.js — which bootstraps
 // everything on DOMContentLoaded — goes LAST but one, with js/pwa.js after it.
 const jsFiles = [
-    'js/ui.js',         // showToast / triggerHaptic — no dependencies, so first
-    'js/firebase.js',   // defines db, auth, firebaseSafe(); everything social needs these
-    'js/push.js',       // needs firebaseSafe + db
-    'js/presence.js',   // needs firebaseSafe + db
-    'js/blackjack.js',  // the app's core feature: shoe, hands, betting, table render
-    'js/tabs.js',       // screen switching + the single DOMContentLoaded bootstrap
-    'js/pwa.js'         // service worker registration + install prompt
+    'js/ui.js',           // showToast / triggerHaptic — no dependencies, so first
+    'js/firebase.js',     // defines db, auth, firebaseSafe(); everything social needs these
+    'js/push.js',         // needs firebaseSafe + db
+    'js/presence.js',     // needs firebaseSafe + db
+    'js/friends.js',      // friend edges, invite codes/links — needs firebaseSafe + db
+    'js/leaderboards.js', // ranks js/friends.js's own data — no separate subscription
+    'js/blackjack.js',    // the app's core feature: shoe, hands, betting, table render
+    'js/tabs.js',         // screen switching + the single DOMContentLoaded bootstrap
+    'js/pwa.js'           // service worker registration + install prompt
 ];
 
 let combinedJs = '';

@@ -85,50 +85,19 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
-    // rooms/{roomId} — shared groups joined by code. APPEND-ONLY memberUids.
-    //
-    // Read is open to any signed-in user: join-by-code has to look up a room
-    // the player is not a member of yet. Keep room contents non-sensitive.
-    //
-    // The update rule is the interesting one. Three clauses, each load-bearing:
-    //
-    //  1. hasOnly(['memberUids', 'updatedAt']) — a joiner may touch nothing
-    //     else. NOTE `updatedAt` is listed: the client stamps it on join and
-    //     the poller's incremental query depends on it. A rule that allowed
-    //     only ['memberUids'] denies every join as actually written, which
-    //     looks like a client bug for a long time.
-    //  2. == resource.data.memberUids.concat([uid]) — the new array must be
-    //     the old array with exactly the caller's own uid appended. No
-    //     removals, no reordering, no adding somebody else.
-    //  3. !(uid in resource.data.memberUids) — concat() does not deduplicate,
-    //     so an already-member re-clicking their own invite link would append
-    //     a duplicate. The client must skip the write entirely in that case;
-    //     this clause enforces it.
+    // NOTE: no rooms/{roomId} collection in this app. Blackjack 21 is
+    // friends + leaderboard only (no shared rooms) — that rule block from the
+    // generic starter was removed rather than kept dormant, so there is no
+    // false sense of security around a path this app never writes to. If
+    // rooms are added later, port the rule back in from
+    // templates/firestore.rules (social-app-stack skill).
     // ---------------------------------------------------------------------
-    match /rooms/{roomId} {
-      allow read: if signedIn();
-      allow create: if signedIn()
-                    && request.resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.memberUids == [request.auth.uid];
-      allow update: if signedIn()
-                    && onlyChanged(['memberUids', 'updatedAt'])
-                    && request.resource.data.memberUids == resource.data.memberUids.concat([request.auth.uid])
-                    && !(request.auth.uid in resource.data.memberUids);
-      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
-
-      // Each member writes only their own entry in the room leaderboard.
-      match /members/{uid} {
-        allow read: if signedIn();
-        allow write: if signedIn() && request.auth.uid == uid;
-      }
-    }
 
     // ---------------------------------------------------------------------
     // referralGroups/{code} — everyone who joined via the same invite link
     // becomes mutual friends with everyone else in the group, not just with
-    // the link owner. `members` is an APPEND-ONLY array of uids, same shape as
-    // the rooms rule above: create with yourself as the sole member, or append
-    // exactly your own uid.
+    // the link owner. `members` is an APPEND-ONLY array of uids: create with
+    // yourself as the sole member, or append exactly your own uid.
     // Read is open to signed-in users so a joiner can see who is already in
     // the group and write the friend edges before appending itself.
     // ---------------------------------------------------------------------
@@ -143,17 +112,12 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
-    // Leaderboards — one entry doc per user per period. Read by everyone
-    // signed in, written only by the owning user.
+    // NOTE: no leaderboards/{periodKey} collection in this app. The friend
+    // leaderboard is computed CLIENT-SIDE from each friend's own users/{uid}
+    // doc (js/leaderboards.js) — no separate collection needed, per
+    // firebase-layer.md's "Friend leaderboards" note. Removed rather than
+    // kept dormant for the same reason as rooms/* above.
     // ---------------------------------------------------------------------
-    match /leaderboards/{periodKey} {
-      allow read: if signedIn();
-      allow write: if false; // the period doc itself is never client-written
-      match /entries/{uid} {
-        allow read: if signedIn();
-        allow write: if signedIn() && request.auth.uid == uid;
-      }
-    }
 
     // ---------------------------------------------------------------------
     // config/{docId} — remote feature flags read by js/firebase.js on load.
@@ -187,11 +151,9 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Permanent award/achievement records, written by the poller only.
-    match /awards/{docId} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
+    // NOTE: no awards/{docId} collection in this app — nothing writes
+    // achievement records yet. Add it explicitly (with its own comment) if a
+    // future phase needs it, rather than leaving a dormant write-false rule.
 
     // ---------------------------------------------------------------------
     // Default deny. Anything not matched above is inaccessible — add new
@@ -207,20 +169,18 @@ service cloud.firestore {
 // COMPANION SETUP THAT RULES ALONE DO NOT COVER
 //
 // 1. COLLECTION GROUP INDEXES. Any `collectionGroup('x').where('field', ...)`
-//    query in scripts/push/* needs an explicit collection-group index:
-//    Console -> Firestore Database -> Indexes -> "Collection Group" tab.
-//    Same-collection single-field indexes are automatic; collection-group
+//    query a future poller (Phase 3) runs needs an explicit collection-group
+//    index: Console -> Firestore Database -> Indexes -> "Collection Group"
+//    tab. Same-collection single-field indexes are automatic; collection-group
 //    scope is NOT. They are free on the Spark plan. Typically needed for:
 //      - collection group `friends`, field `addedAt`, ascending
-//      - collection group `members`, field `updatedAt`, ascending
 //
-// 2. POLLER-OWNED FIELDS — do not hand-edit. scripts/push/* caches "what did
-//    this look like last poll?" on the documents it watches, because a poller
-//    gets no before/after snapshot. All are underscore-prefixed and safe to
-//    delete (the next poll re-seeds them silently, notifying nobody):
+// 2. POLLER-OWNED FIELDS — do not hand-edit. A poller (Phase 3) caches "what
+//    did this look like last poll?" on the documents it watches, because it
+//    gets no before/after snapshot. Underscore-prefixed and safe to delete
+//    (the next poll re-seeds them silently, notifying nobody):
 //      - users/{uid}._prevScore
-//      - rooms/{roomId}._prevMemberUids
-//    These are written by the Admin SDK, so they need no client rule — but the
+//    Written by the Admin SDK, so it needs no client rule — but the
 //    owner-write rule on users/{uid} does technically let a user overwrite
 //    their own cache. That is harmless (worst case: one spurious or missing
 //    notification for themselves).

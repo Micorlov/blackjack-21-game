@@ -1,0 +1,97 @@
+/* Friends screen: invite code, add-friend row, leaderboard + friends list
+   rows. Builds on .panel/.section-label/.btn-* from styles/layout.css — no
+   new primitives, just the row layouts specific to this screen. */
+
+.invite-panel {
+    text-align: center;
+}
+
+.invite-code {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+}
+
+.add-friend-row {
+    display: flex;
+    gap: 8px;
+}
+
+.friend-code-input {
+    flex: 1;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--surface-900);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.friend-code-input::placeholder {
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 500;
+    color: var(--text-faint);
+}
+
+.add-friend-row .btn-secondary {
+    flex: 0 0 auto;
+    padding: 12px 18px;
+}
+
+.leaderboard-row,
+.friend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.leaderboard-row:last-child,
+.friend-row:last-child {
+    border-bottom: none;
+}
+
+.leaderboard-rank {
+    width: 20px;
+    font-weight: 700;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.leaderboard-row.me .leaderboard-name,
+.leaderboard-row.me .leaderboard-score {
+    color: var(--accent);
+}
+
+.leaderboard-name,
+.friend-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.leaderboard-score,
+.friend-score {
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.friend-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+    flex: 0 0 auto;
+}

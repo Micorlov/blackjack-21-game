@@ -108,12 +108,28 @@
                 </div>
             </div>
 
+            <!--
+              Insurance: shown instead of the action panel for exactly one
+              decision, only when the dealer's up-card is an Ace — see
+              bjRenderInsurancePanel() in js/blackjack.js. The dealer's hole
+              card stays face-down underneath until this resolves.
+            -->
+            <div class="panel insurance-panel hidden" id="insurance-panel">
+                <div class="section-label">Dealer shows an Ace</div>
+                <p class="muted">Insure your hand for <span id="insurance-amount">$0</span>? Pays 2:1 if the dealer has blackjack.</p>
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="declineInsurance()">No thanks</button>
+                    <button class="btn-primary" onclick="takeInsurance()">Insure</button>
+                </div>
+            </div>
+
             <div class="panel action-panel hidden" id="action-panel">
                 <div class="btn-row">
                     <button class="btn-secondary" onclick="playerHit()">Hit</button>
                     <button class="btn-secondary" onclick="playerStand()">Stand</button>
                     <button class="btn-secondary" id="btn-double" onclick="playerDouble()">Double</button>
                     <button class="btn-secondary" id="btn-split" onclick="playerSplit()">Split</button>
+                    <button class="btn-secondary" id="btn-surrender" onclick="playerSurrender()">Surrender</button>
                 </div>
             </div>
 
@@ -151,6 +167,35 @@
                     <div class="panel"><div class="stat-value" id="stat-current-streak">0</div><div class="stat-label">Current streak</div></div>
                     <div class="panel"><div class="stat-value" id="stat-best-streak">0</div><div class="stat-label">Best streak</div></div>
                 </div>
+            </div>
+        </section>
+
+        <section id="screen-social" class="screen">
+            <h1 class="screen-title">Friends</h1>
+
+            <div class="section-label">Your invite code</div>
+            <div class="panel invite-panel">
+                <div class="invite-code" id="own-invite-code">------</div>
+                <button class="btn-primary" onclick="shareInviteLink()">Share invite link</button>
+            </div>
+
+            <div class="section-label">Add a friend</div>
+            <div class="panel">
+                <div class="add-friend-row">
+                    <input type="text" id="friend-code-input" class="friend-code-input" placeholder="Friend's code" maxlength="6" autocapitalize="characters" autocomplete="off">
+                    <button class="btn-secondary" onclick="addFriendByCode()">Add</button>
+                </div>
+            </div>
+
+            <div class="section-label">Leaderboard</div>
+            <div class="panel">
+                <div id="leaderboard-list"></div>
+            </div>
+
+            <div class="section-label">Friends</div>
+            <div class="panel">
+                <div id="friends-list"></div>
+                <p class="muted hidden" id="friends-empty">No friends yet — share your invite code or add one above.</p>
             </div>
         </section>
 
@@ -217,6 +262,10 @@
             <button class="nav-btn" id="nav-stats" onclick="showScreen('stats')">
                 <span class="nav-icon">▤</span>
                 <span>Stats</span>
+            </button>
+            <button class="nav-btn" id="nav-social" onclick="showScreen('social')">
+                <span class="nav-icon">♦</span>
+                <span>Friends</span>
             </button>
             <button class="nav-btn" id="nav-settings" onclick="showScreen('settings')">
                 <span class="nav-icon">⚙</span>
