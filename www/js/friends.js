@@ -11,6 +11,7 @@ let _friendsByUid = {};    // friendUid -> { uid, displayName, photoURL, score, 
 function _friendsChanged() {
     renderFriendsScreen();
     if (window.renderLeaderboard) renderLeaderboard();
+    if (window.renderHomeFriends) renderHomeFriends();
 }
 
 // The single source of truth js/leaderboards.js reads from — do not start a

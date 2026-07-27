@@ -138,6 +138,17 @@
                 <p class="muted">The house extends you a courtesy stack so you can keep playing.</p>
                 <button class="btn-primary" onclick="resetBankroll()">Get 1000 complimentary chips</button>
             </div>
+
+            <!--
+              Compact friends leaderboard, mirrors the Friends screen's own
+              list (js/leaderboards.js) but capped to a few rows. Hidden
+              entirely when signed out or friendless — see
+              renderHomeFriends() for the condition.
+            -->
+            <div class="panel hidden" id="home-friends-panel">
+                <div class="section-label">Friends</div>
+                <div id="home-friends-list"></div>
+            </div>
         </section>
 
         <section id="screen-stats" class="screen">

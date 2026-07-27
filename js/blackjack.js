@@ -245,6 +245,10 @@ function bjRenderTable() {
     bjRenderHands();
     bjRenderBetPanel();
     bjRenderInsurancePanel();
+    // Optional module (js/leaderboards.js) — keeps the Home screen's own chip
+    // balance reflected in the friends widget after every round, without the
+    // core game depending on the social layer being present.
+    if (window.renderHomeFriends) renderHomeFriends();
     if (bjPhase === 'playing') bjRenderActionButtons();
 }
 

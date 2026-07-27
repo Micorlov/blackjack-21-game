@@ -34,31 +34,61 @@ function rankedLeaderboard() {
     return entries.sort(function(a, b) { return (b.score || 0) - (a.score || 0); });
 }
 
+function _buildLeaderboardRow(entry, rank) {
+    const row = document.createElement('div');
+    row.className = 'leaderboard-row' + (entry.self ? ' me' : '');
+
+    const rankEl = document.createElement('span');
+    rankEl.className = 'leaderboard-rank';
+    rankEl.textContent = String(rank);
+
+    const name = document.createElement('span');
+    name.className = 'leaderboard-name';
+    name.textContent = entry.self ? 'You' : (entry.displayName || 'Player');
+
+    const score = document.createElement('span');
+    score.className = 'leaderboard-score';
+    score.textContent = '$' + (entry.score || 0);
+
+    row.appendChild(rankEl);
+    row.appendChild(name);
+    row.appendChild(score);
+    return row;
+}
+
 function renderLeaderboard() {
     const listEl = document.getElementById('leaderboard-list');
     if (!listEl) return;
 
     listEl.innerHTML = '';
     rankedLeaderboard().forEach(function(entry, i) {
-        const row = document.createElement('div');
-        row.className = 'leaderboard-row' + (entry.self ? ' me' : '');
-
-        const rank = document.createElement('span');
-        rank.className = 'leaderboard-rank';
-        rank.textContent = String(i + 1);
-
-        const name = document.createElement('span');
-        name.className = 'leaderboard-name';
-        name.textContent = entry.self ? 'You' : (entry.displayName || 'Player');
-
-        const score = document.createElement('span');
-        score.className = 'leaderboard-score';
-        score.textContent = '$' + (entry.score || 0);
-
-        row.appendChild(rank);
-        row.appendChild(name);
-        row.appendChild(score);
-        listEl.appendChild(row);
+        listEl.appendChild(_buildLeaderboardRow(entry, i + 1));
     });
 }
 window.renderLeaderboard = renderLeaderboard;
+
+// Compact version of the same ranking for the Home screen — see
+// architecture.md's screen convention; this is deliberately a SEPARATE
+// element from the Friends screen's #leaderboard-list rather than shared,
+// since the two show a different number of rows.
+const HOME_FRIENDS_MAX_ROWS = 5;
+
+function renderHomeFriends() {
+    const panel = document.getElementById('home-friends-panel');
+    const listEl = document.getElementById('home-friends-list');
+    if (!panel || !listEl) return;
+
+    // Nothing meaningful to show signed out, or signed in with no friends
+    // yet — hide the panel entirely rather than show a lone "You" row or an
+    // empty state that just repeats what the Friends tab already explains.
+    const ranked = rankedLeaderboard();
+    const hasFriends = ranked.some(function(entry) { return !entry.self; });
+    panel.classList.toggle('hidden', !hasFriends);
+    if (!hasFriends) return;
+
+    listEl.innerHTML = '';
+    ranked.slice(0, HOME_FRIENDS_MAX_ROWS).forEach(function(entry, i) {
+        listEl.appendChild(_buildLeaderboardRow(entry, i + 1));
+    });
+}
+window.renderHomeFriends = renderHomeFriends;
