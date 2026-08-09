@@ -35,7 +35,12 @@ jobs:
       # Generate new private key). This step cannot be automated — the key is
       # a credential and must be pasted in by a human.
       - name: Write Firebase service account key
-        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}' > "${{ runner.temp }}/firebase-service-account.json"
+        run: |
+          if [ -z "${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT_KEY secret is not set. Add it in Settings -> Secrets and variables -> Actions (see comment above)."
+            exit 1
+          fi
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}' > "${{ runner.temp }}/firebase-service-account.json"
 
       # scripts/lib/firebaseAdmin.js calls initializeApp() with no arguments;
       # it picks the credentials up from this standard env var.
